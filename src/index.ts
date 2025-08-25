@@ -2,21 +2,21 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { API_KEY, email } from "./utils/http-client.js";
+import { API_KEY, EMAIL } from "./utils/http-client.js";
 import { apiClient } from "./utils/http-client.js";
 
 // Create server instance
 const server = new McpServer({
-    name: "Shadcn MCP Server",
+    name: "shadcn-studio MCP Server",
     version: "1.0.0",
 });
 
-// A tool to get create Instructions to follow for IDE agent to generate/create/update Shadcn blocks.
+// A tool to get create Instructions to follow for IDE agent to generate/create/update shadcn/studio blocks.
 server.registerTool(
     "get-create-instructions",
     {
-        title: "Get Instructions for Shadcn.",
-        description: "Get instructions for creating Shadcn blocks using existing blocks. This tool provides instructions for creating new Shadcn blocks using existing blocks. Use this tool when the user requests to generate a new component. mentions /create-shadcn or /cui. Strictly follow the steps one by one to ensure successful code generation.Retrieves Instructions for IDE agent to follow for creating/generating/updating Shadcn blocks.",
+        title: "Get Instructions for shadcn/studio.",
+        description: "Get instructions for creating Shadcn blocks using existing blocks. This tool provides instructions for creating new Shadcn blocks using existing blocks. Use this tool when the user requests to generate a new component. mentions /create-shadcn or /cui. Strictly follow the steps one by one to ensure successful code generation.Retrieves Instructions for IDE agent to follow for creating/generating/updating shadcn blocks.",
     },
     async () => {
         try {
@@ -182,7 +182,7 @@ server.registerTool(
     },
     async ({ endpoint }) => {
         try {
-            const url = `/r/blocks/${endpoint}` + `?license_key=${API_KEY.replace(/"/g, '')}&email=${email.replace(/"/g, '')}`;
+            const url = `/r/blocks/${endpoint}` + `?license_key=${API_KEY?.replace(/"/g, '')}&email=${EMAIL?.replace(/"/g, '')}`;
             const response = await apiClient.get(url);
 
             if (response.status !== 200) {
@@ -216,11 +216,44 @@ server.registerTool(
     },
     async ({ endpoint }) => {
         try {
-            const url = `/api/mcp/inspiration?blockPath=${endpoint}` + `&license_key=${API_KEY.replace(/"/g, '')}&email=${email.replace(/"/g, '')}`;
+            const url = `/api/mcp/inspiration?blockPath=${endpoint}` + `&license_key=${API_KEY?.replace(/"/g, '')}&email=${EMAIL?.replace(/"/g, '')}`;
             const response = await apiClient.get(url);
 
             if (response.status !== 200) {
                 throw new Error(`Failed to fetch block data: ${response.status}`);
+            }
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify(response.data, null, 2),
+                    }
+                ],
+            };
+        }
+        catch (error) {
+            console.error("Error fetching block data:", error);
+            throw new Error("Failed to fetch block data");
+        }
+    }
+);
+
+// A tool to get the content of a component from a given URL. (RUI)
+server.registerTool(
+    "get-component-content",
+    {
+        title: "Get Component Data",
+        description: "Fetch the content of a component from a given URL. Use this tool to retrieve the code block content from the authenticated URL.",
+        inputSchema: { endpoint: z.string() },
+    },
+    async ({ endpoint }) => {
+        try {
+            const url = `/api/mcp/components?component=${endpoint}`;
+            const response = await apiClient.get(url);
+
+            if (response.status !== 200) {
+                throw new Error(`Failed to fetch component data: ${response.status}`);
             }
 
             return {

@@ -1,5 +1,5 @@
 {
-  "name": "shadcnstudio-mcp",
+  "name": "shadcn-studio-mcp",
   "type": "module",
   "version": "0.0.0",
   "main": "index.js",
@@ -14,15 +14,15 @@
     "build"
   ],
   "keywords": [
-    "shadcnstudio",
+    "shadcn-studio",
     "mcp",
     "model-context-protocol",
     "cli"
   ],
   "homepage": "https://shadcnstudio.com/",
-  "author": "Heet Bhalodiya",
+  "author": "Themeselection",
   "license": "MIT",
-  "description": "ShadcnStudio MCP",
+  "description": "shadcn-studio MCP",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.0",
     "zod": "^3.25.67"

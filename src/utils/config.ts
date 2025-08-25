@@ -1,5 +1,6 @@
 export interface Config {
     apiKey?: string;
+    email?: string;
 }
 
 const parseArguments = (): Config => {
@@ -18,10 +19,14 @@ const parseArguments = (): Config => {
             const match = arg.match(pattern);
             if (match) {
                 const [, key, value] = match;
+                // Strip surrounding quotes from the value
+                const cleanValue = value.replaceAll('"', "").replaceAll("'", "");
+                
                 if (key === "API_KEY") {
-                    // Strip surrounding quotes from the value
-                    const cleanValue = value.replaceAll('"', "").replaceAll("'", "");
                     config.apiKey = cleanValue;
+                    break;
+                } else if (key === "EMAIL") {
+                    config.email = cleanValue;
                     break;
                 }
             }

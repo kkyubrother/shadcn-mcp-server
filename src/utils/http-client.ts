@@ -1,10 +1,7 @@
 import { config } from "./config.js";
 
-// const API_KEY =
-//     config.apiKey || process.env.API_KEY;
-
-export const API_KEY = "05BF733E-780C-4F06-BFCE-C75B99FF3DA7"
-export const email = "heet@themeselection.com"
+export const API_KEY = config.apiKey || process.env.API_KEY;
+export const EMAIL = config.email || process.env.EMAIL;
 
 export const BASE_URL = "http://localhost:3000";
 
@@ -46,6 +43,7 @@ const createMethod = (method: HttpMethod) => {
         const headers: HeadersInit = {
             "Content-Type": "application/json",
             ...(API_KEY ? { "x-license-key": API_KEY } : {}),
+            ...(EMAIL ? { "x-email": EMAIL } : {}),
             ...options.headers,
         };
 
