@@ -1,9 +1,9 @@
 import { config } from "./config.js";
 
-export const API_KEY = config.apiKey || process.env.API_KEY;
-export const EMAIL = config.email || process.env.EMAIL;
+export const API_KEY = config.apiKey;
+export const EMAIL = config.email;
 
-export const BASE_URL = "http://localhost:3000";
+export const BASE_URL = "https://shadcn-studio-internal-staging.vercel.app";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
