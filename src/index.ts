@@ -241,7 +241,7 @@ server.registerTool(
 
 // A tool to get the content of a component from a given URL. (RUI)
 server.registerTool(
-    "get-component-content",
+    "get-component-meta-content",
     {
         title: "Get Component Data",
         description: "Fetch the content of a component from a given URL. Use this tool to retrieve the code block content from the authenticated URL.",
@@ -268,6 +268,39 @@ server.registerTool(
         catch (error) {
             console.error("Error fetching block data:", error);
             throw new Error("Failed to fetch block data");
+        }
+    }
+);
+
+// A tool to get the content of a component from a given URL. (RUI)
+server.registerTool(
+    "get-component-content",
+    {
+        title: "Get Component Data",
+        description: "Fetch the content of a component from a given URL. Use this tool to retrieve the code component content from the authenticated URL.",
+        inputSchema: { endpoint: z.string() },
+    },
+    async ({ endpoint }) => {
+        try {
+            const url = `/r/components/${endpoint}` + `?license_key=${API_KEY?.replace(/"/g, '')}&email=${EMAIL?.replace(/"/g, '')}`;
+            const response = await apiClient.get(url);
+
+            if (response.status !== 200) {
+                throw new Error(`Failed to fetch component data: ${response.status}`);
+            }
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify(response.data, null, 2),
+                    }
+                ],
+            };
+        }
+        catch (error) {
+            console.error("Error fetching component data:", error);
+            throw new Error("Failed to fetch component data");
         }
     }
 );
