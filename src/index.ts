@@ -4,6 +4,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { API_KEY, EMAIL } from "./utils/http-client.js";
 import { apiClient } from "./utils/http-client.js";
+import { handleMcpError } from "./utils/errors.js";
+import { Validator } from "./utils/validation.js";
 
 // Create server instance
 const server = new McpServer({
@@ -16,29 +18,29 @@ server.registerTool(
     "get-create-instructions",
     {
         title: "Get Instructions for shadcn/studio.",
-        description: "Get instructions for creating Shadcn blocks using existing blocks. This tool provides instructions for creating new Shadcn blocks using existing blocks. Use this tool when the user requests to generate a new component. mentions /create-shadcn or /cui. Strictly follow the steps one by one to ensure successful code generation.Retrieves Instructions for IDE agent to follow for creating/generating/updating shadcn blocks.",
+        description:
+            "Get instructions for creating Shadcn blocks using existing blocks. This tool provides instructions for creating new Shadcn blocks using existing blocks. Use this tool when the user requests to generate a new component. mentions /create-shadcn or /cui. Strictly follow the steps one by one to ensure successful code generation.Retrieves Instructions for IDE agent to follow for creating/generating/updating shadcn blocks.",
     },
     async () => {
         try {
             const url = `/api/mcp/instructions?path=create-ui.md`;
             const response = await apiClient.get(url);
 
-            if (response.status !== 200) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
             return {
                 content: [
                     {
                         type: "text",
                         text: JSON.stringify(response.data, null, 2),
-                    }
+                    },
                 ],
             };
-        }
-        catch (error) {
-            console.error("Error fetching block metadata:", error);
-            throw new Error("Failed to fetch block metadata");
+        } catch (error) {
+            console.error("Error fetching create instructions:", error);
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
         }
     }
 );
@@ -47,30 +49,31 @@ server.registerTool(
 server.registerTool(
     "get-inspire-instructions",
     {
-        title: "Get Instructions for generating Shadcn blocks using the existing Shadcn blocks as an inspiration.",
-        description: "Get instructions for working with Shadcn blocks. This tool provides instructions for creating new Shadcn blocks by taking the inspiration from existing Shadcn blocks. Use this tool when the user requests to generate a new component by inspirations. mentions /inspire-shadcn or /iui.",
+        title:
+            "Get Instructions for generating Shadcn blocks using the existing Shadcn blocks as an inspiration.",
+        description:
+            "Get instructions for working with Shadcn blocks. This tool provides instructions for creating new Shadcn blocks by taking the inspiration from existing Shadcn blocks. Use this tool when the user requests to generate a new component by inspirations. mentions /inspire-shadcn or /iui. The instructions will guide you to use IUI-specific tools: get-blocks-metadata, get-inspiration-block-content.",
     },
     async () => {
         try {
             const url = `/api/mcp/instructions?path=inspire-ui.md`;
             const response = await apiClient.get(url);
 
-            if (response.status !== 200) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
             return {
                 content: [
                     {
                         type: "text",
                         text: JSON.stringify(response.data, null, 2),
-                    }
+                    },
                 ],
             };
-        }
-        catch (error) {
-            console.error("Error fetching block metadata:", error);
-            throw new Error("Failed to fetch block metadata");
+        } catch (error) {
+            console.error("Error fetching inspire instructions:", error);
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
         }
     }
 );
@@ -79,30 +82,31 @@ server.registerTool(
 server.registerTool(
     "get-refine-instructions",
     {
-        title: "Get Instructions for refining Shadcn blocks/code/component or page.",
-        description: "Get instructions for refining Shadcn blocks. This tool provides instructions for refining existing Shadcn blocks. Use this tool when the user requests to refine an existing component. mentions /refine-shadcn or /rui.",
+        title:
+            "Get Instructions for refining Shadcn blocks/code/component or page.",
+        description:
+            "Get instructions for refining Shadcn blocks. This tool provides instructions for refining existing Shadcn blocks. Use this tool when the user requests to refine an existing component. mentions /refine-shadcn or /rui.",
     },
     async () => {
         try {
             const url = `/api/mcp/instructions?path=refine-ui.md`;
             const response = await apiClient.get(url);
 
-            if (response.status !== 200) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
             return {
                 content: [
                     {
                         type: "text",
                         text: JSON.stringify(response.data, null, 2),
-                    }
+                    },
                 ],
             };
-        }
-        catch (error) {
-            console.error("Error fetching block metadata:", error);
-            throw new Error("Failed to fetch block metadata");
+        } catch (error) {
+            console.error("Error fetching refine instructions:", error);
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
         }
     }
 );
@@ -111,40 +115,42 @@ server.registerTool(
 server.registerTool(
     "get-blocks-metadata",
     {
-        title: "Get Block Metadata",
-        description: "Fetch the metadata of a block from a given URL. Use this tool to retrieve the block metadata. This will provide the metadata of all the Shadcn blocks available for use.",
+        title: "Get Blocks Metadata",
+        description:
+            "FOR CREATE_UI (/cui) AND INSPIRATION UI (/iui) : Retrieve metadata of all available blocks. Returns list of available blocks with names, descriptions, and categories.",
+        inputSchema: {},
     },
     async () => {
         try {
             const url = `/api/mcp/instructions?path=block_metadata.json`;
             const response = await apiClient.get(url);
 
-            if (response.status !== 200) {
-                throw new Error(`Failed to fetch block metadata: ${response.status}`);
-            }
-
             return {
                 content: [
                     {
                         type: "text",
                         text: JSON.stringify(response.data, null, 2),
-                    }
+                    },
                 ],
             };
-        }
-        catch (error) {
+        } catch (error) {
             console.error("Error fetching block metadata:", error);
-            throw new Error("Failed to fetch block metadata");
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
         }
     }
 );
 
-// A tool to get the metadata of the block.
+// A tool to get the metadata of the block. (FOR CREATE-UI WORKFLOW)
 server.registerTool(
     "get-block-meta-content",
     {
-        title: "Get Block Meta Content",
-        description: "Fetch the content of the block metadata from the Shadcn MCP server. Use this tool to retrieve the block metadata content.",
+        title: "Get Block Meta Content (CREATE-UI WORKFLOW)",
+        description:
+            "FOR CREATE-UI WORKFLOW (/cui): Fetch detailed information about blocks in a specific category for installation. Use this to explore and select the most suitable block for installation. DO NOT use for inspire-ui workflow.",
         inputSchema: { endpoint: z.string() },
     },
     async ({ endpoint }) => {
@@ -152,99 +158,306 @@ server.registerTool(
             const url = `/api/mcp${endpoint}`;
             const response = await apiClient.get(url);
 
-            if (response.status !== 200) {
-                throw new Error(`Failed to fetch block meta content: ${response.status}`);
-            }
-
             return {
                 content: [
                     {
                         type: "text",
                         text: JSON.stringify(response.data, null, 2),
-                    }
+                    },
                 ],
             };
-        }
-        catch (error) {
+        } catch (error) {
             console.error("Error fetching block meta content:", error);
-            throw new Error("Failed to fetch block meta content");
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
         }
     }
 );
 
-// A tool to get the content of a block from a given URL. (CUI)
-server.registerTool(
-    "get-block-content",
-    {
-        title: "Get Block Data",
-        description: "Fetch the content of a block from a given URL. Use this tool to retrieve the code block content from the authenticated URL.",
-        inputSchema: { endpoint: z.string() },
-    },
-    async ({ endpoint }) => {
-        try {
-            const url = `/r/blocks/${endpoint}` + `?license_key=${API_KEY?.replace(/"/g, '')}&email=${EMAIL?.replace(/"/g, '')}`;
-            const response = await apiClient.get(url);
+// Simple in-memory storage for collected blocks with session management
+let collectedBlocks: Array<{ blockName: string; blockType: string }> = [];
+let lastCollectionTime: number = 0;
+const COLLECTION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes timeout
 
-            if (response.status !== 200) {
-                throw new Error(`Failed to fetch block data: ${response.status}`);
+// Helper function to check and clear stale collections
+function checkAndClearStaleCollection(): void {
+    const now = Date.now();
+    if (
+        collectedBlocks.length > 0 &&
+        now - lastCollectionTime > COLLECTION_TIMEOUT_MS
+    ) {
+        collectedBlocks = [];
+        lastCollectionTime = 0;
+    }
+}
+
+// A tool to collect selected blocks before generating final command (FOR CREATE-UI WORKFLOW)
+server.registerTool(
+    "collect_selected_blocks",
+    {
+        title: "Collect Selected Blocks (CREATE-UI WORKFLOW)",
+        description:
+            "FOR CREATE-UI WORKFLOW (/cui): Collect and store selected blocks for batch installation command generation. Use this tool after selecting a specific block from get-block-meta-content. This tool accumulates blocks until all required blocks are selected, then allows final command generation. DO NOT use for inspire-ui workflow.",
+        inputSchema: {
+            blockName: z
+                .string()
+                .describe(
+                    "The name of the selected block (e.g., 'hero-section-01', 'navbar-component-13')"
+                ),
+            blockType: z
+                .string()
+                .describe(
+                    "The type/category of the block (e.g., 'hero', 'navbar', 'pricing', 'footer')"
+                ),
+            action: z
+                .enum(["add", "list", "clear"])
+                .describe(
+                    "Action to perform: 'add' to add a block, 'list' to show collected blocks, 'clear' to reset the collection"
+                ),
+        },
+    },
+    async ({ blockName, blockType, action }) => {
+        try {
+            // Check for stale collections before any operation
+            checkAndClearStaleCollection();
+
+            switch (action) {
+                case "add":
+                    // Add the block to collection
+                    const existingIndex = collectedBlocks.findIndex(
+                        (block) => block.blockType === blockType
+                    );
+
+                    if (existingIndex >= 0) {
+                        // Replace if same type exists
+                        collectedBlocks[existingIndex] = { blockName, blockType };
+                    } else {
+                        // Add new block
+                        collectedBlocks.push({ blockName, blockType });
+                    }
+
+                    // Update the last collection time
+                    lastCollectionTime = Date.now();
+
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify(
+                                    {
+                                        message: `Block '${blockName}' (${blockType}) added to collection`,
+                                        collectedBlocks: collectedBlocks,
+                                        totalBlocks: collectedBlocks.length,
+                                        readyForCommand: collectedBlocks.length > 0,
+                                        sessionInfo: {
+                                            lastUpdated: new Date(lastCollectionTime).toISOString(),
+                                            timeoutMinutes: COLLECTION_TIMEOUT_MS / (60 * 1000),
+                                        },
+                                    },
+                                    null,
+                                    2
+                                ),
+                            },
+                        ],
+                    };
+
+                case "list":
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify(
+                                    {
+                                        collectedBlocks: collectedBlocks,
+                                        totalBlocks: collectedBlocks.length,
+                                        readyForCommand: collectedBlocks.length > 0,
+                                        sessionInfo:
+                                            lastCollectionTime > 0
+                                                ? {
+                                                    lastUpdated: new Date(
+                                                        lastCollectionTime
+                                                    ).toISOString(),
+                                                    timeoutMinutes: COLLECTION_TIMEOUT_MS / (60 * 1000),
+                                                }
+                                                : null,
+                                    },
+                                    null,
+                                    2
+                                ),
+                            },
+                        ],
+                    };
+
+                case "clear":
+                    collectedBlocks = [];
+                    lastCollectionTime = 0;
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify(
+                                    {
+                                        message: "Block collection cleared",
+                                        collectedBlocks: [],
+                                        totalBlocks: 0,
+                                        readyForCommand: false,
+                                    },
+                                    null,
+                                    2
+                                ),
+                            },
+                        ],
+                    };
+
+                default:
+                    throw new Error("Invalid action");
+            }
+        } catch (error) {
+            console.error("Error in collect_selected_blocks:", error);
+            throw new Error("Failed to manage block collection");
+        }
+    }
+);
+
+server.registerTool(
+    "get_add_command_for_items",
+    {
+        title: "Generate Installation Command (CREATE-UI WORKFLOW)",
+        description:
+            "FOR CREATE-UI WORKFLOW (/cui): Generate the shadcn CLI add command for all collected blocks. This returns the exact command that should be executed to install the components. DO NOT use for inspire-ui workflow.",
+        inputSchema: {
+            useCollectedBlocks: z
+                .boolean()
+                .optional()
+                .default(true)
+                .describe(
+                    "Whether to use the collected blocks (default: true) or provide custom items"
+                ),
+            items: z
+                .array(z.string())
+                .optional()
+                .describe(
+                    "Array of items to get the add command for (only used if useCollectedBlocks is false)"
+                ),
+        },
+    },
+    async ({ useCollectedBlocks = true, items = [] }) => {
+        try {
+            // Check for stale collections before processing
+            checkAndClearStaleCollection();
+
+            let blocksToProcess: string[] = [];
+
+            if (useCollectedBlocks) {
+                // Use the collected blocks
+                if (!collectedBlocks || collectedBlocks.length === 0) {
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify(
+                                    {
+                                        error: "No blocks have been collected yet",
+                                        suggestion:
+                                            "Use collect_selected_blocks to add blocks first, then generate the command",
+                                        collectedBlocks: collectedBlocks,
+                                        totalBlocks: 0,
+                                    },
+                                    null,
+                                    2
+                                ),
+                            },
+                        ],
+                    };
+                }
+
+                // Convert collected blocks to the format expected
+                blocksToProcess = collectedBlocks.map(
+                    (block) => `@ss-blocks/${block.blockName}`
+                );
+            } else {
+                // Use provided items
+                blocksToProcess = items;
+            }
+
+            // Generate the command - exactly like shadcn MCP does it
+            const command = `pnpm dlx shadcn@latest add ${blocksToProcess.join(" ")}`;
+
+            // Auto-clear the collected blocks after successful command generation
+            // This prevents blocks from persisting across different chat sessions
+            if (useCollectedBlocks && collectedBlocks.length > 0) {
+                collectedBlocks = []; // Clear the collection
+                lastCollectionTime = 0; // Reset timestamp
             }
 
             return {
                 content: [
                     {
                         type: "text",
-                        text: JSON.stringify(response.data, null, 2),
-                    }
+                        text: command,
+                    },
                 ],
             };
-        }
-        catch (error) {
-            console.error("Error fetching block data:", error);
-            throw new Error("Failed to fetch block data");
+        } catch (error) {
+            console.error("Error generating add commands:", error);
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Error: Failed to generate add commands - ${error instanceof Error ? error.message : String(error)
+                            }`,
+                    },
+                ],
+                isError: true,
+            };
         }
     }
 );
-
 
 // IUI
 server.registerTool(
     "get-inspiration-block-content",
     {
-        title: "Get Inspiration Block Data",
-        description: "Fetch the content of an inspiration block from a given URL. Use this tool to retrieve the code block content from the authenticated URL.",
+        title: "Get Inspiration Block Data (INSPIRE-UI WORKFLOW)",
+        description:
+            "FOR INSPIRE-UI WORKFLOW (/iui): Fetch the content of an inspiration block from a given URL. Use this tool to retrieve the code block content for inspiration and analysis purposes only. DO NOT use for create-ui or refine-ui workflows.",
         inputSchema: { endpoint: z.string() },
     },
     async ({ endpoint }) => {
         try {
             const url = `/api/mcp/inspiration?blockPath=${endpoint}` + `&license_key=${API_KEY?.replace(/"/g, '')}&email=${EMAIL?.replace(/"/g, '')}`;
             const response = await apiClient.get(url);
-
-            if (response.status !== 200) {
-                throw new Error(`Failed to fetch block data: ${response.status}`);
-            }
+            Validator.validateHttpResponse(response.status, url);
 
             return {
                 content: [
                     {
                         type: "text",
                         text: JSON.stringify(response.data, null, 2),
-                    }
+                    },
                 ],
             };
-        }
-        catch (error) {
+        } catch (error) {
             console.error("Error fetching block data:", error);
-            throw new Error("Failed to fetch block data");
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
         }
     }
 );
 
-// A tool to get the content of a component from a given URL. (RUI)
+// A tool to get the content of a component from a given URL. (RUI - REFINE USE CASE ONLY)
 server.registerTool(
     "get-component-meta-content",
     {
-        title: "Get Component Data",
-        description: "Fetch the content of a component from a given URL. Use this tool to retrieve the code block content from the authenticated URL.",
+        title: "Get Component Data (REFINE WORKFLOW ONLY)",
+        description:
+            "FOR REFINE WORKFLOW ONLY: Fetch the content of a component from a given URL. This tool is ONLY for the refine workflow (/rui). DO NOT use this for create-ui workflow - use get-block-meta-content instead.",
         inputSchema: { endpoint: z.string() },
     },
     async ({ endpoint }) => {
@@ -252,55 +465,56 @@ server.registerTool(
             const url = `/api/mcp/components?component=${endpoint}`;
             const response = await apiClient.get(url);
 
-            if (response.status !== 200) {
-                throw new Error(`Failed to fetch component data: ${response.status}`);
-            }
-
             return {
                 content: [
                     {
                         type: "text",
                         text: JSON.stringify(response.data, null, 2),
-                    }
+                    },
                 ],
             };
-        }
-        catch (error) {
-            console.error("Error fetching block data:", error);
-            throw new Error("Failed to fetch block data");
+        } catch (error) {
+            console.error("Error fetching component data:", error);
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
         }
     }
 );
 
-// A tool to get the content of a component from a given URL. (RUI)
+// A tool to get the content of a component from a given URL. (RUI - REFINE USE CASE ONLY)
 server.registerTool(
     "get-component-content",
     {
-        title: "Get Component Data",
-        description: "Fetch the content of a component from a given URL. Use this tool to retrieve the code component content from the authenticated URL.",
+        title: "Get Component Content (REFINE WORKFLOW ONLY)",
+        description:
+            "FOR REFINE WORKFLOW ONLY: Fetch the content of a component from a given URL. This tool is ONLY for the refine workflow (/rui). DO NOT use this for create-ui workflow - use get-block-content instead.",
         inputSchema: { endpoint: z.string() },
     },
     async ({ endpoint }) => {
         try {
-            const url = `/r/components/${endpoint}` + `?license_key=${API_KEY?.replace(/"/g, '')}&email=${EMAIL?.replace(/"/g, '')}`;
+            const url =
+                `/r/components/${endpoint}` +
+                `?license_key=${API_KEY?.replace(/"/g, "")}&email=${EMAIL?.replace(/"/g, "")}`;
             const response = await apiClient.get(url);
-
-            if (response.status !== 200) {
-                throw new Error(`Failed to fetch component data: ${response.status}`);
-            }
 
             return {
                 content: [
                     {
                         type: "text",
                         text: JSON.stringify(response.data, null, 2),
-                    }
+                    },
                 ],
             };
-        }
-        catch (error) {
+        } catch (error) {
             console.error("Error fetching component data:", error);
-            throw new Error("Failed to fetch component data");
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
         }
     }
 );

@@ -10,7 +10,7 @@ const parseArguments = (): Config => {
     if (process.env.API_KEY) {
         config.apiKey = process.env.API_KEY;
     }
-    
+
     if (process.env.EMAIL) {
         config.email = process.env.EMAIL;
     }
@@ -31,7 +31,7 @@ const parseArguments = (): Config => {
             const match = arg.match(pattern);
             if (match) {
                 const [, key, value] = match;
-                
+
                 // Strip surrounding quotes from the value
                 const cleanValue = value.replaceAll('"', "").replaceAll("'", "");
 
@@ -55,3 +55,11 @@ const parseArguments = (): Config => {
 };
 
 export const config = parseArguments();
+
+/**
+ * Check if user has pro credentials (both API_KEY and EMAIL provided)
+ * Returns true for pro users, false for freemium users
+ */
+export const isPro = (): boolean => {
+    return !!(config.apiKey && config.email);
+};
