@@ -42,3 +42,30 @@ export class Validator {
     }
   }
 }
+
+
+/**
+ * Format theme name from user input to proper theme name
+ * Examples: "Modern Minimal" -> "modern-minimal", "Dark Blue" -> "dark-blue"
+ */
+export function formatThemeName(themeName: string): string {
+  // Convert to lowercase, replace spaces with dashes, remove extra characters
+  return themeName
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-') // Replace spaces with dashes
+    .replace(/[^a-z0-9-]/g, '') // Remove any characters that aren't alphanumeric or dashes
+    .replace(/-+/g, '-') // Replace multiple consecutive dashes with single dash
+    .replace(/^-|-$/g, ''); // Remove leading and trailing dashes
+}
+
+/**
+ * Determine if theme name is a public theme or private user theme
+ * Public themes: simple names like "modern-minimal", "dark-blue", etc.
+ * Private themes: UUID format or complex naming patterns
+ */
+export function getThemeNamespace(themeName: string): string {
+  const formattedName = formatThemeName(themeName);
+
+  return `@ss-themes/${formattedName}`;
+}

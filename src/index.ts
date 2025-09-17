@@ -5,13 +5,14 @@ import { z } from "zod";
 import { API_KEY, EMAIL } from "./utils/http-client.js";
 import { apiClient } from "./utils/http-client.js";
 import { handleMcpError } from "./utils/errors.js";
-import { Validator } from "./utils/validation.js";
+import { Validator, formatThemeName, getThemeNamespace } from "./utils/validation.js";
 
 // Create server instance
 const server = new McpServer({
     name: "shadcn-studio MCP Server",
     version: "1.0.0",
 });
+
 
 // A tool to get create Instructions to follow for IDE agent to generate/create/update shadcn/studio blocks.
 server.registerTool(
@@ -384,7 +385,7 @@ server.registerTool(
             }
 
             // Generate the command - exactly like shadcn MCP does it
-            const command = `pnpm dlx shadcn@latest add ${blocksToProcess.join(" ")}`;
+            const command = `npx shadcn@latest add ${blocksToProcess.join(" ")}`;
 
             // Auto-clear the collected blocks after successful command generation
             // This prevents blocks from persisting across different chat sessions
@@ -455,9 +456,9 @@ server.registerTool(
 server.registerTool(
     "get-component-meta-content",
     {
-        title: "Get Component Data (REFINE WORKFLOW ONLY)",
+        title: "Search Component Metadata (REFINE WORKFLOW ONLY)",
         description:
-            "FOR REFINE WORKFLOW ONLY: Fetch the content of a component from a given URL. This tool is ONLY for the refine workflow (/rui). DO NOT use this for create-ui workflow - use get-block-meta-content instead.",
+            "FOR REFINE WORKFLOW ONLY: Search and find the most appropriate component from user query. This tool searches through available components metadata to identify which component is most suitable for the user's requirements. Use this tool first to discover suitable components before using get-component-content. This tool is ONLY for the refine workflow (/rui). DO NOT use this for create-ui workflow - use get-block-meta-content instead.",
         inputSchema: { endpoint: z.string() },
     },
     async ({ endpoint }) => {
@@ -488,9 +489,9 @@ server.registerTool(
 server.registerTool(
     "get-component-content",
     {
-        title: "Get Component Content (REFINE WORKFLOW ONLY)",
+        title: "Get Component Content & Install Command (REFINE WORKFLOW ONLY)",
         description:
-            "FOR REFINE WORKFLOW ONLY: Fetch the content of a component from a given URL. This tool is ONLY for the refine workflow (/rui). DO NOT use this for create-ui workflow - use get-block-content instead.",
+            "FOR REFINE WORKFLOW ONLY: If a component was found from get-component-meta-content tool, this tool fetches the component content and generates the shadcn CLI installation command for that component. If no suitable component is found, this tool will help create/update components according to the user query. This returns the exact command that should be executed to install the components. This tool is ONLY for the refine workflow (/rui). DO NOT use this for create-ui workflow - use get-block-content instead.",
         inputSchema: { endpoint: z.string() },
     },
     async ({ endpoint }) => {
@@ -510,6 +511,55 @@ server.registerTool(
             };
         } catch (error) {
             console.error("Error fetching component data:", error);
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
+        }
+    }
+);
+
+// A tool to install themes from Shadcn Studio (RUI - REFINE USE CASE ONLY)
+server.registerTool(
+    "install-theme",
+    {
+        title: "Install Shadcn Studio Theme (REFINE WORKFLOW ONLY)",
+        description:
+            "FOR REFINE WORKFLOW ONLY (/rui): Install a theme from Shadcn Studio using the appropriate package manager. Supports both public themes (e.g., 'modern-minimal') and private user themes (UUID format). Automatically detects the project's package manager (npm, pnpm, yarn, bun) and generates the correct installation command. DO NOT use this for create-ui (/cui) or inspire-ui (/iui) workflows.",
+        inputSchema: {
+            themeName: z.string().describe("The name or UUID of the theme to install (e.g., 'modern-minimal' for public themes or UUID for private themes)")
+        },
+    },
+    async ({ themeName }) => {
+        try {
+            // Format the theme name (converts "Modern Minimal" to "modern-minimal")
+            const formattedThemeName = formatThemeName(themeName);
+
+            // Get the proper theme namespace
+            const themeNamespace = getThemeNamespace(formattedThemeName);
+
+            // Generate the installation command
+            const installCommand = `npx shadcn@latest add ${themeNamespace}`;
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify({
+                            success: true,
+                            command: installCommand,
+                            originalThemeName: themeName,
+                            formattedThemeName: formattedThemeName,
+                            themeNamespace: themeNamespace,
+                            message: `Ready to install theme '${formattedThemeName}'`,
+                            instructions: "Execute the provided command to install the theme to your project"
+                        }, null, 2),
+                    },
+                ],
+            };
+        } catch (error) {
+            console.error("Error generating theme install command:", error);
             const errorResponse = handleMcpError(error);
             return {
                 content: errorResponse.content,
