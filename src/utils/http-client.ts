@@ -5,7 +5,7 @@ import { Validator, ValidationSchemas } from "./validation.js";
 export const API_KEY = config.apiKey;
 export const EMAIL = config.email;
 
-export const BASE_URL = "https://shadcn-studio-internal-staging.vercel.app";
+export const BASE_URL = "https://shadcnstudio.com";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 

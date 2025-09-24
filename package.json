@@ -1,7 +1,7 @@
 {
   "name": "shadcn-studio-mcp",
   "type": "module",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "index.js",
   "bin": {
     "shadcn-mcp": "build/index.js"
@@ -19,7 +19,7 @@
     "model-context-protocol",
     "cli"
   ],
-  "homepage": "https://shadcnstudio.com/",
+  "homepage": "https://shadcnstudio.com",
   "author": "Themeselection",
   "license": "MIT",
   "description": "shadcn-studio MCP",
