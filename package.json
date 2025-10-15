@@ -1,7 +1,7 @@
 {
   "name": "shadcn-studio-mcp",
   "type": "module",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "main": "index.js",
   "bin": {
     "shadcn-mcp": "build/index.js"

@@ -112,6 +112,39 @@ server.registerTool(
     }
 );
 
+// A tool to get instructions for Figma to Code workflow.
+server.registerTool(
+    "get-ftc-instructions",
+    {
+        title:
+            "Get Instructions for Figma to Code workflow.",
+        description:
+            "Get instructions for converting Figma designs to code using Shadcn blocks. This tool provides step-by-step instructions for the Figma to Code workflow. Use this tool when the user requests to convert Figma design to code. mentions /figma-to-code or /ftc. The workflow involves: 1) Using Figma MCP to list Pro/Free Blocks component instances, 2) Using our MCP to install matching blocks, 3) Building the page structure, 4) Replacing content from Figma.",
+    },
+    async () => {
+        try {
+            const url = `/api/mcp/instructions?path=figma-to-code-ui.md`;
+            const response = await apiClient.get(url);
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify(response.data, null, 2),
+                    },
+                ],
+            };
+        } catch (error) {
+            console.error("Error fetching FTC instructions:", error);
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
+        }
+    }
+);
+
 // A tool to get the metadata of a block from a given URL.
 server.registerTool(
     "get-blocks-metadata",
@@ -136,6 +169,95 @@ server.registerTool(
             };
         } catch (error) {
             console.error("Error fetching block metadata:", error);
+            const errorResponse = handleMcpError(error);
+            return {
+                content: errorResponse.content,
+                isError: errorResponse.isError,
+            };
+        }
+    }
+);
+
+// A tool to parse Figma component names and convert to Shadcn Studio block format (FOR FTC WORKFLOW)
+server.registerTool(
+    "parse-figma-blocks",
+    {
+        title: "Parse Figma Component Names (FIGMA-TO-CODE WORKFLOW)",
+        description:
+            "FOR FIGMA-TO-CODE WORKFLOW (/ftc): Parse Figma component instance names and convert them to proper Shadcn Studio block format for installation. Converts names like 'Pro Blocks / Marketing-ui / features-section / Feature 01' to '@ss-blocks/feature-01' or 'Free Blocks / Marketing-ui / features-section / Feature 01' to '@ss-blocks/feature-01' Use this tool after getting component list from Figma MCP. DO NOT use for create-ui, inspire-ui, or refine-ui workflows.",
+        inputSchema: {
+            figmaComponents: z.array(z.string()).describe("Array of Figma component instance names from Figma MCP (e.g., ['Pro Blocks / Marketing-ui / features-section / Feature 01', 'Pro Blocks / Marketing-ui / hero-section / Hero 03'])"),
+        },
+    },
+    async ({ figmaComponents }) => {
+        try {
+            if (!figmaComponents || figmaComponents.length === 0) {
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify(
+                                {
+                                    error: "No Figma components provided",
+                                    suggestion: "Use Figma MCP first to get the list of component instances from the selected frame",
+                                    parsedBlocks: [],
+                                },
+                                null,
+                                2
+                            ),
+                        },
+                    ],
+                };
+            }
+
+            // Parse each Figma component name to extract the block name
+            const parsedBlocks = figmaComponents.map((componentName) => {
+                // Example: "Pro Blocks / Marketing-ui / hero-section / hero-section-04"
+                // Should become: "hero-section-04"
+                const parts = componentName.split('/').map(part => part.trim());
+
+                // Get the last part (the actual block name)
+                const lastPart = parts[parts.length - 1]; // "hero-section-04" or "Hero Section 04"
+
+                // Convert to kebab-case: "Hero Section 04" -> "hero-section-04"
+                const kebabName = lastPart
+                    .toLowerCase()
+                    .replace(/\s+/g, '-')
+                    .replace(/[^a-z0-9-]/g, '');
+
+                // Get category (second to last part)
+                const category = parts.length > 2 && parts[parts.length - 2];
+
+                return {
+                    original: componentName,
+                    blockName: kebabName,
+                    namespace: `@ss-blocks/${kebabName}`,
+                    category: category,
+                };
+            });
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify(
+                            {
+                                success: true,
+                                totalComponents: figmaComponents.length,
+                                parsedBlocks: parsedBlocks,
+                                nextSteps: [
+                                    "Use collect_selected_blocks to add these blocks to collection",
+                                    "After collecting all blocks, use get_add_command_for_items to generate installation command"
+                                ],
+                            },
+                            null,
+                            2
+                        ),
+                    },
+                ],
+            };
+        } catch (error) {
+            console.error("Error parsing Figma components:", error);
             const errorResponse = handleMcpError(error);
             return {
                 content: errorResponse.content,
@@ -199,19 +321,19 @@ function checkAndClearStaleCollection(): void {
 server.registerTool(
     "collect_selected_blocks",
     {
-        title: "Collect Selected Blocks (CREATE-UI WORKFLOW)",
+        title: "Collect Selected Blocks (CREATE-UI & FTC WORKFLOW)",
         description:
-            "FOR CREATE-UI WORKFLOW (/cui): Collect and store selected blocks for batch installation command generation. Use this tool after selecting a specific block from get-block-meta-content. This tool accumulates blocks until all required blocks are selected, then allows final command generation. DO NOT use for inspire-ui workflow.",
+            "FOR CREATE-UI WORKFLOW (/cui) AND FIGMA-TO-CODE WORKFLOW (/ftc): Collect and store selected blocks for batch installation command generation. Use this tool after selecting a specific block from get-block-meta-content (for /cui) or after parsing Figma components with parse-figma-blocks (for /ftc). This tool accumulates blocks until all required blocks are selected, then allows final command generation. DO NOT use for inspire-ui workflow.",
         inputSchema: {
             blockName: z
                 .string()
                 .describe(
-                    "The name of the selected block (e.g., 'hero-section-01', 'navbar-component-13')"
+                    "The name of the selected block (e.g., 'hero-section-01', 'navbar-component-13', 'feature-01')"
                 ),
             blockType: z
                 .string()
                 .describe(
-                    "The type/category of the block (e.g., 'hero', 'navbar', 'pricing', 'footer')"
+                    "The type/category of the block (e.g., 'hero', 'navbar', 'pricing', 'footer', 'features-section')"
                 ),
             action: z
                 .enum(["add", "list", "clear"])
@@ -326,9 +448,9 @@ server.registerTool(
 server.registerTool(
     "get_add_command_for_items",
     {
-        title: "Generate Installation Command (CREATE-UI WORKFLOW)",
+        title: "Generate Installation Command (CREATE-UI & FTC WORKFLOW)",
         description:
-            "FOR CREATE-UI WORKFLOW (/cui): Generate the shadcn CLI add command for all collected blocks. This returns the exact command that should be executed to install the components. DO NOT use for inspire-ui workflow.",
+            "FOR CREATE-UI WORKFLOW (/cui) AND FIGMA-TO-CODE WORKFLOW (/ftc): Generate the shadcn CLI add command for all collected blocks. This returns the exact command that should be executed to install the components. DO NOT use for inspire-ui workflow.",
         inputSchema: {
             useCollectedBlocks: z
                 .boolean()
@@ -376,9 +498,16 @@ server.registerTool(
                 }
 
                 // Convert collected blocks to the format expected
-                blocksToProcess = collectedBlocks.map(
-                    (block) => `@ss-blocks/${block.blockName}`
-                );
+                // Auto-detect namespace: if block name already has @, use as-is, otherwise add @ss-blocks/
+                blocksToProcess = collectedBlocks.map((block) => {
+                    const blockName = block.blockName;
+                    // If blockName already starts with @, use it as-is (for FTC workflow with @ss-blocks/)
+                    if (blockName.startsWith('@')) {
+                        return blockName;
+                    }
+                    // Otherwise, add @ss-blocks/ prefix (for CUI workflow)
+                    return `@ss-blocks/${blockName}`;
+                });
             } else {
                 // Use provided items
                 blocksToProcess = items;
