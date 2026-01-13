@@ -305,6 +305,11 @@ let collectedBlocks: Array<{ blockName: string; blockType: string }> = [];
 let lastCollectionTime: number = 0;
 const COLLECTION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes timeout
 
+// Simple in-memory storage for collected components (RUI workflow)
+let collectedComponents: Array<{ componentName: string; componentType: string }> = [];
+let lastComponentCollectionTime: number = 0;
+const COMPONENT_COLLECTION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes timeout
+
 // Helper function to check and clear stale collections
 function checkAndClearStaleCollection(): void {
     const now = Date.now();
@@ -314,6 +319,18 @@ function checkAndClearStaleCollection(): void {
     ) {
         collectedBlocks = [];
         lastCollectionTime = 0;
+    }
+}
+
+// Helper function to check and clear stale component collections
+function checkAndClearStaleComponentCollection(): void {
+    const now = Date.now();
+    if (
+        collectedComponents.length > 0 &&
+        now - lastComponentCollectionTime > COMPONENT_COLLECTION_TIMEOUT_MS
+    ) {
+        collectedComponents = [];
+        lastComponentCollectionTime = 0;
     }
 }
 
@@ -626,7 +643,7 @@ server.registerTool(
     async ({ endpoint }) => {
         try {
             const url =
-                `/r/components/${endpoint}` +
+                `/r/components/${endpoint}.json` +
                 `?license_key=${API_KEY?.replace(/"/g, "")}&email=${EMAIL?.replace(/"/g, "")}`;
             const response = await apiClient.get(url);
 
@@ -644,6 +661,236 @@ server.registerTool(
             return {
                 content: errorResponse.content,
                 isError: errorResponse.isError,
+            };
+        }
+    }
+);
+
+// A tool to collect selected components before generating final command (FOR REFINE-UI WORKFLOW)
+server.registerTool(
+    "collect_selected_components",
+    {
+        title: "Collect Selected Components (REFINE-UI WORKFLOW)",
+        description:
+            "FOR REFINE-UI WORKFLOW (/rui): Collect and store selected components for batch installation command generation. Use this tool after selecting a specific component from get-component-meta-content. This tool accumulates components until all required components are selected, then allows final command generation. DO NOT use for create-ui or inspire-ui workflows.",
+        inputSchema: {
+            componentName: z
+                .string()
+                .describe(
+                    "The name of the selected component (e.g., 'button-44', 'alert-12', 'card-05')"
+                ),
+            componentType: z
+                .string()
+                .describe(
+                    "The type/category of the component (e.g., 'button', 'alert', 'card', 'input')"
+                ),
+            action: z
+                .enum(["add", "list", "clear"])
+                .describe(
+                    "Action to perform: 'add' to add a component, 'list' to show collected components, 'clear' to reset the collection"
+                ),
+        },
+    },
+    async ({ componentName, componentType, action }) => {
+        try {
+            // Check for stale collections before any operation
+            checkAndClearStaleComponentCollection();
+
+            switch (action) {
+                case "add":
+                    // Add the component to collection
+                    const existingIndex = collectedComponents.findIndex(
+                        (comp) => comp.componentType === componentType
+                    );
+
+                    if (existingIndex >= 0) {
+                        // Replace if same type exists
+                        collectedComponents[existingIndex] = { componentName, componentType };
+                    } else {
+                        // Add new component
+                        collectedComponents.push({ componentName, componentType });
+                    }
+
+                    // Update the last collection time
+                    lastComponentCollectionTime = Date.now();
+
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify(
+                                    {
+                                        message: `Component '${componentName}' (${componentType}) added to collection`,
+                                        collectedComponents: collectedComponents,
+                                        totalComponents: collectedComponents.length,
+                                        readyForCommand: collectedComponents.length > 0,
+                                        sessionInfo: {
+                                            lastUpdated: new Date(lastComponentCollectionTime).toISOString(),
+                                            timeoutMinutes: COMPONENT_COLLECTION_TIMEOUT_MS / (60 * 1000),
+                                        },
+                                    },
+                                    null,
+                                    2
+                                ),
+                            },
+                        ],
+                    };
+
+                case "list":
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify(
+                                    {
+                                        collectedComponents: collectedComponents,
+                                        totalComponents: collectedComponents.length,
+                                        readyForCommand: collectedComponents.length > 0,
+                                        sessionInfo:
+                                            lastComponentCollectionTime > 0
+                                                ? {
+                                                    lastUpdated: new Date(
+                                                        lastComponentCollectionTime
+                                                    ).toISOString(),
+                                                    timeoutMinutes: COMPONENT_COLLECTION_TIMEOUT_MS / (60 * 1000),
+                                                }
+                                                : null,
+                                    },
+                                    null,
+                                    2
+                                ),
+                            },
+                        ],
+                    };
+
+                case "clear":
+                    collectedComponents = [];
+                    lastComponentCollectionTime = 0;
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify(
+                                    {
+                                        message: "Component collection cleared",
+                                        collectedComponents: [],
+                                        totalComponents: 0,
+                                        readyForCommand: false,
+                                    },
+                                    null,
+                                    2
+                                ),
+                            },
+                        ],
+                    };
+
+                default:
+                    throw new Error("Invalid action");
+            }
+        } catch (error) {
+            console.error("Error in collect_selected_components:", error);
+            throw new Error("Failed to manage component collection");
+        }
+    }
+);
+
+// A tool to generate installation command for collected components (FOR REFINE-UI WORKFLOW)
+server.registerTool(
+    "get_add_command_for_components",
+    {
+        title: "Generate Component Installation Command (REFINE-UI WORKFLOW)",
+        description:
+            "FOR REFINE-UI WORKFLOW (/rui): Generate the shadcn CLI add command for all collected components. This returns the exact command that should be executed to install the components. DO NOT use for create-ui or inspire-ui workflows.",
+        inputSchema: {
+            useCollectedComponents: z
+                .boolean()
+                .optional()
+                .default(true)
+                .describe(
+                    "Whether to use the collected components (default: true) or provide custom items"
+                ),
+            items: z
+                .array(z.string())
+                .optional()
+                .describe(
+                    "Array of items to get the add command for (only used if useCollectedComponents is false)"
+                ),
+        },
+    },
+    async ({ useCollectedComponents = true, items = [] }) => {
+        try {
+            // Check for stale collections before processing
+            checkAndClearStaleComponentCollection();
+
+            let componentsToProcess: string[] = [];
+
+            if (useCollectedComponents) {
+                // Use the collected components
+                if (!collectedComponents || collectedComponents.length === 0) {
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify(
+                                    {
+                                        error: "No components have been collected yet",
+                                        suggestion:
+                                            "Use collect_selected_components to add components first, then generate the command",
+                                        collectedComponents: collectedComponents,
+                                        totalComponents: 0,
+                                    },
+                                    null,
+                                    2
+                                ),
+                            },
+                        ],
+                    };
+                }
+
+                // Convert collected components to the format expected
+                // Components always use @ss-components/ namespace
+                componentsToProcess = collectedComponents.map((comp) => {
+                    const componentName = comp.componentName;
+                    // If componentName already starts with @, use it as-is
+                    if (componentName.startsWith('@')) {
+                        return componentName;
+                    }
+                    // Otherwise, add @ss-components/ prefix
+                    return `@ss-components/${componentName}`;
+                });
+            } else {
+                // Use provided items
+                componentsToProcess = items;
+            }
+
+            // Generate the command
+            const command = `npx shadcn@latest add ${componentsToProcess.join(" ")}`;
+
+            // Auto-clear the collected components after successful command generation
+            if (useCollectedComponents && collectedComponents.length > 0) {
+                collectedComponents = []; // Clear the collection
+                lastComponentCollectionTime = 0; // Reset timestamp
+            }
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: command,
+                    },
+                ],
+            };
+        } catch (error) {
+            console.error("Error generating component add commands:", error);
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Error: Failed to generate component add commands - ${error instanceof Error ? error.message : String(error)
+                            }`,
+                    },
+                ],
+                isError: true,
             };
         }
     }
