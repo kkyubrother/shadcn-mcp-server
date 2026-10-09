@@ -65,6 +65,9 @@ const createMethod = (method: HttpMethod) => {
             const requestInit: RequestInit = {
                 ...options,
                 method,
+                signal: options.signal
+                    ? AbortSignal.any([options.signal, AbortSignal.timeout(30000)])
+                    : AbortSignal.timeout(30000),
                 headers: { ...headers, ...options.headers as Record<string, string> },
             };
 
