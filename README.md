@@ -73,69 +73,104 @@ names are no longer read. Legacy CLI arguments `API_KEY=...` / `EMAIL=...` are
 still accepted and override the environment values. Omit both credentials for
 free features; Pro features require both.
 
-### Client configuration
+### Client configuration (including remote-server tokens)
 
-Start the server above before connecting. If you changed `MCP_HTTP_PORT`, use
-that port in every client URL. The default `38473` avoids common development
-ports but is not reserved; choose another port if it is already in use.
-Replace existing stdio entries instead of keeping a second copy under another name.
+Start the server before connecting. The examples below connect to a server at
+`http://192.168.9.29:38473/mcp`; replace the address with your server's reachable
+IP/hostname. For a server on the same computer, use `http://127.0.0.1:38473/mcp`.
+If you changed `MCP_HTTP_PORT`, change the client URL too.
+
+**Every client must send the same token configured as `MCP_HTTP_TOKEN` on the
+server**, using `Authorization: Bearer <token>`. Replace `YOUR_MCP_HTTP_TOKEN` in
+the examples with that token, not your Shadcn license key. Setting the token only
+on the server does not configure the clients. `SHADCN_STUDIO_API_KEY` and
+`SHADCN_STUDIO_EMAIL` remain on the server and are not needed in client settings.
+
+For example, the remote server's environment file contains:
+
+```dotenv
+MCP_HTTP_HOST=0.0.0.0
+MCP_HTTP_PORT=38473
+MCP_HTTP_ALLOWED_HOSTS=192.168.9.29
+MCP_HTTP_TOKEN=YOUR_MCP_HTTP_TOKEN
+```
+
+Use one client configuration below. Replace existing stdio or unauthenticated
+entries rather than adding a second copy under another name. The default port
+`38473` is not reserved; choose another port if it is already in use.
 
 #### Claude Code
 
-Register the running HTTP server for your user (all projects):
+Set the token in the terminal where you register the connection:
 
 ```bash
-claude mcp add --transport http --scope user shadcn-studio-mcp http://127.0.0.1:38473/mcp
+export MCP_HTTP_TOKEN='YOUR_MCP_HTTP_TOKEN'
+claude mcp add \
+  --header "Authorization: Bearer ${MCP_HTTP_TOKEN:?Set the server token first}" \
+  --transport http --scope user \
+  shadcn-studio-mcp http://192.168.9.29:38473/mcp
 ```
 
-If the same name is already registered with `--scope user` using stdio, remove
-that entry first, then run the HTTP registration command above:
+If the same name already exists in user scope, remove that entry first and then
+run the registration command above:
 
 ```bash
 claude mcp remove --scope user shadcn-studio-mcp
 ```
 
-If your old entry is project- or local-scoped, update that scope instead; a
-higher-priority entry can override the user-scoped server. Use `--scope project`
-in place of `--scope user` to save configuration in the project's `.mcp.json`.
+If the existing entry is project- or local-scoped, update that scope instead;
+a higher-priority entry can override the user-scoped entry. Use `--scope project`
+instead of `--scope user` to save configuration in the project's `.mcp.json`.
 
-When the server uses `MCP_HTTP_TOKEN`, use this registration command instead.
-Export the same token in the terminal where you run this command:
-
-```bash
-claude mcp add \
-  --header "Authorization: Bearer ${MCP_HTTP_TOKEN:?Set the server token first}" \
-  --transport http --scope user \
-  shadcn-studio-mcp http://127.0.0.1:38473/mcp
-```
-
-The shell expands the token before registration, so this stores its value in
-Claude Code's MCP configuration. This token authenticates to your local server;
-Shadcn `SHADCN_STUDIO_API_KEY` and `SHADCN_STUDIO_EMAIL` belong in the server environment.
-
-Check registration with `claude mcp get shadcn-studio-mcp`, and use `/mcp` inside
-Claude Code to check the connection and available tools. This server does not
-provide OAuth login. See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
+The shell expands the token at registration time, so Claude Code stores the token
+value in its MCP configuration. When rotating the server token, update the client
+entry too. Check the connection and tools with `/mcp` inside Claude Code. There is
+no OAuth login for this server. See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
 
 #### Codex
 
-Codex (`~/.codex/config.toml`):
+Export the token in the environment that **launches Codex**:
+
+```bash
+export MCP_HTTP_TOKEN='YOUR_MCP_HTTP_TOKEN'
+codex
+```
+
+In `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.shadcn-studio-mcp]
-url = "http://127.0.0.1:38473/mcp"
+url = "http://192.168.9.29:38473/mcp"
+bearer_token_env_var = "MCP_HTTP_TOKEN"
 ```
+
+`bearer_token_env_var` contains the variable's **name**, not the token. An already
+running desktop app does not inherit an export made in another terminal. If the
+app launcher cannot provide this environment variable, use an explicit header
+instead of `bearer_token_env_var`:
+
+```toml
+[mcp_servers.shadcn-studio-mcp]
+url = "http://192.168.9.29:38473/mcp"
+http_headers = { Authorization = "Bearer YOUR_MCP_HTTP_TOKEN" }
+```
+
+Choose one of these two entries, not both. The header alternative stores the token
+in the configuration file. Restart/reconnect the client after changing settings.
 
 #### OpenCode
 
-OpenCode (`~/.config/opencode/opencode.json`, merge into existing settings):
+In `~/.config/opencode/opencode.json`, merge this server into existing settings:
 
 ```json
 {
   "mcp": {
     "shadcn-studio-mcp": {
       "type": "remote",
-      "url": "http://127.0.0.1:38473/mcp",
+      "url": "http://192.168.9.29:38473/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_MCP_HTTP_TOKEN"
+      },
       "oauth": false,
       "enabled": true
     }
@@ -143,23 +178,46 @@ OpenCode (`~/.config/opencode/opencode.json`, merge into existing settings):
 }
 ```
 
+Replace the token placeholder with the server token. `oauth: false` keeps this
+connection on static bearer authentication rather than OAuth discovery.
+
 #### Antigravity
 
-Antigravity (MCP Servers → Manage MCP Servers → View raw config):
+Open MCP Servers → Manage MCP Servers → View raw config and merge this entry:
 
 ```json
 {
   "mcpServers": {
     "shadcn-studio-mcp": {
-      "serverUrl": "http://127.0.0.1:38473/mcp"
+      "serverUrl": "http://192.168.9.29:38473/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_MCP_HTTP_TOKEN"
+      }
     }
   }
 }
 ```
 
+Replace the token placeholder with the server token and reconnect the server.
+OpenCode and Antigravity examples above store the token in their configuration
+files; do not commit populated configurations to a shared repository.
+
+#### Connection checks
+
+- **401 Unauthorized:** the client omitted the bearer token or used a different one.
+- **403 Host or Origin not allowed:** include the URL's hostname/IP in the server's
+  `MCP_HTTP_ALLOWED_HOSTS`; browser Origin requests are not supported.
+- **Connection refused:** check that the service is running, the port is correct,
+  and the bind address is reachable. This occurs before token validation.
+
+For local-only operation with no server-side `MCP_HTTP_TOKEN`, omit the client
+Authorization header or `bearer_token_env_var`. External binding requires a token.
+Use HTTPS or an SSH tunnel for connections across untrusted networks; the example
+HTTP endpoint itself does not encrypt the token.
+
 These are configuration examples. Automated interoperability tests use the
-official MCP TypeScript client; individual client applications and Pro API access
-need separate acceptance testing.
+official MCP TypeScript client; individual client applications need separate
+acceptance testing.
 
 ### Session isolation and limits
 
