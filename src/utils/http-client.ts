@@ -7,33 +7,8 @@ export const EMAIL = config.email;
 
 export const BASE_URL = "https://shadcnstudio.com";
 
-type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-
 interface HttpClient {
-    get<T>(
-        endpoint: string,
-        options?: RequestInit
-    ): Promise<{ status: number; data: T }>;
-    post<T>(
-        endpoint: string,
-        data?: unknown,
-        options?: RequestInit
-    ): Promise<{ status: number; data: T }>;
-    put<T>(
-        endpoint: string,
-        data?: unknown,
-        options?: RequestInit
-    ): Promise<{ status: number; data: T }>;
-    delete<T>(
-        endpoint: string,
-        data?: unknown,
-        options?: RequestInit
-    ): Promise<{ status: number; data: T }>;
-    patch<T>(
-        endpoint: string,
-        data?: unknown,
-        options?: RequestInit
-    ): Promise<{ status: number; data: T }>;
+    get<T>(endpoint: string, options?: RequestInit): Promise<{ status: number; data: T }>;
 }
 
 /**
@@ -45,10 +20,8 @@ function validateCredentialsForProUsers() {
     }
 }
 
-const createMethod = (method: HttpMethod) => {
-    return async <T>(
+const get = async <T>(
         endpoint: string,
-        data?: unknown,
         options: RequestInit = {}
     ): Promise<{ status: number; data: T }> => {
         try {
@@ -64,16 +37,12 @@ const createMethod = (method: HttpMethod) => {
 
             const requestInit: RequestInit = {
                 ...options,
-                method,
+                method: "GET",
                 signal: options.signal
                     ? AbortSignal.any([options.signal, AbortSignal.timeout(30000)])
                     : AbortSignal.timeout(30000),
                 headers: { ...headers, ...options.headers as Record<string, string> },
             };
-
-            if (data) {
-                requestInit.body = JSON.stringify(data);
-            }
 
             const response = await fetch(`${BASE_URL}${endpoint}`, requestInit);
 
@@ -127,13 +96,6 @@ const createMethod = (method: HttpMethod) => {
             }
             throw createApiError(endpoint, 0, `Network error: ${error instanceof Error ? error.message : String(error)}`);
         }
-    };
 };
 
-export const apiClient: HttpClient = {
-    get: createMethod("GET"),
-    post: createMethod("POST"),
-    put: createMethod("PUT"),
-    delete: createMethod("DELETE"),
-    patch: createMethod("PATCH"),
-};
+export const apiClient: HttpClient = { get };

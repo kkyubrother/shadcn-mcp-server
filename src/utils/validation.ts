@@ -8,7 +8,6 @@ export const ValidationSchemas = {
   apiEndpoint: z.string().min(1).regex(/^\//),
   email: z.string().email(),
   apiKey: z.string().min(10),
-  httpStatus: z.number().int().min(100).max(599),
 };
 
 /**

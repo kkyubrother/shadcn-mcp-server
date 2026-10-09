@@ -274,10 +274,11 @@ npm run typecheck
 npm test
 ```
 
-Integration tests cover concurrent clients, collection isolation, explicit-item
-calls, deletion, expiry, capacity, malformed requests, authentication, Host/Origin
-validation and stdio compatibility. Tests use local-only tools and do not require
-credentials or call Shadcn Studio's API.
+Four integration tests cover the fork's core behavior: concurrent-session
+isolation, session cleanup/capacity, external-access authentication and host
+restrictions, and multiple clients without child processes. CI runs these on
+Node.js 24; `npm test` also compiles TypeScript. Tests use local-only tools and
+do not require credentials or call Shadcn Studio's API.
 
 ## Optional: stdio from this fork
 
