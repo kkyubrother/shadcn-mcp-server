@@ -28,10 +28,50 @@ npm run start:http
 The endpoint is `http://127.0.0.1:38473/mcp`. Keep this single server running and
 configure each client with its URL. Do not launch a copy for each client.
 
-For Pro features, set `API_KEY` and `EMAIL` in the **server process environment**.
+For Pro features, set `SHADCN_STUDIO_API_KEY` and `SHADCN_STUDIO_EMAIL` in the
+**server process environment**.
 CLI `API_KEY=...` / `EMAIL=...` arguments remain supported. No Shadcn credential
 is required in each client's MCP configuration. All sessions in this deployment
 use the same Shadcn account; this is not a multi-tenant credential service.
+
+### Server credentials
+
+Set both values on the machine **running the server**, before starting it:
+
+```bash
+export SHADCN_STUDIO_API_KEY='your-shadcn-license-key'
+export SHADCN_STUDIO_EMAIL='your-account-email'
+npm run start:http
+```
+
+These exports apply to the current shell and processes started from it. Restart
+an already-running server after changing them. HTTP clients only need the server
+URL and, when enabled, `MCP_HTTP_TOKEN`; they do not need your Shadcn credentials.
+`MCP_HTTP_TOKEN` protects access to this server and is separate from the Shadcn
+license key used for outbound API requests.
+
+For the systemd user service described below, put literal values in
+`~/.config/shadcn-studio-mcp/server.env`:
+
+```dotenv
+SHADCN_STUDIO_API_KEY=your-shadcn-license-key
+SHADCN_STUDIO_EMAIL=your-account-email
+```
+
+```bash
+chmod 600 ~/.config/shadcn-studio-mcp/server.env
+systemctl --user restart shadcn-studio-mcp.service
+```
+
+systemd loads this file through `EnvironmentFile`; exports in an interactive
+terminal do not update the running service. The application does not automatically
+load a `.env` file. Keep the populated environment file outside the repository.
+
+If migrating an existing deployment, rename environment variables `API_KEY` and
+`EMAIL` to `SHADCN_STUDIO_API_KEY` and `SHADCN_STUDIO_EMAIL`; the generic environment
+names are no longer read. Legacy CLI arguments `API_KEY=...` / `EMAIL=...` are
+still accepted and override the environment values. Omit both credentials for
+free features; Pro features require both.
 
 ### Client configuration
 
@@ -71,7 +111,7 @@ claude mcp add \
 
 The shell expands the token before registration, so this stores its value in
 Claude Code's MCP configuration. This token authenticates to your local server;
-Shadcn `API_KEY` and `EMAIL` belong in the server environment.
+Shadcn `SHADCN_STUDIO_API_KEY` and `SHADCN_STUDIO_EMAIL` belong in the server environment.
 
 Check registration with `claude mcp get shadcn-studio-mcp`, and use `/mcp` inside
 Claude Code to check the connection and available tools. This server does not
@@ -303,7 +343,7 @@ server environment or existing `API_KEY=...` and `EMAIL=...` arguments.
 `npx -y shadcn-studio-mcp` installs the upstream npm release, **not this fork**.
 The [upstream installation guide](https://shadcnstudio.com/mcp/onboarding) applies
 to that release. Free features need no credentials; Pro features need both
-`API_KEY` and `EMAIL`.
+`SHADCN_STUDIO_API_KEY` and `SHADCN_STUDIO_EMAIL`.
 
 ## 📒 Documentation
 
