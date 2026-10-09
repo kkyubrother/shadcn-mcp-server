@@ -7,12 +7,12 @@ const parseArguments = (): Config => {
     const config: Config = {};
 
     // First, check environment variables
-    if (process.env.API_KEY) {
-        config.apiKey = process.env.API_KEY;
+    if (process.env.SHADCN_STUDIO_API_KEY) {
+        config.apiKey = process.env.SHADCN_STUDIO_API_KEY;
     }
 
-    if (process.env.EMAIL) {
-        config.email = process.env.EMAIL;
+    if (process.env.SHADCN_STUDIO_EMAIL) {
+        config.email = process.env.SHADCN_STUDIO_EMAIL;
     }
 
     // Command line arguments override environment variables
@@ -57,7 +57,7 @@ const parseArguments = (): Config => {
 export const config = parseArguments();
 
 /**
- * Check if user has pro credentials (both API_KEY and EMAIL provided)
+ * Check if user has pro credentials (both API key and email provided)
  * Returns true for pro users, false for freemium users
  */
 export const isPro = (): boolean => {

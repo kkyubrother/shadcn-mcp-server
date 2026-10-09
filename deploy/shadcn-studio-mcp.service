@@ -1,0 +1,17 @@
+[Unit]
+Description=Shadcn Studio Streamable HTTP MCP server
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/share/shadcn-mcp-server
+ExecStart=/usr/bin/node %h/.local/share/shadcn-mcp-server/build/index.js --transport=streamable-http
+EnvironmentFile=%h/.config/shadcn-studio-mcp/server.env
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=40
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
