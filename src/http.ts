@@ -1,5 +1,6 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
+import { isIP } from "node:net";
 import express from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
@@ -7,6 +8,8 @@ import { createMcpServer } from "./server.js";
 
 export interface HttpOptions {
     port?: number;
+    host?: string;
+    allowedHosts?: string[];
     maxSessions?: number;
     sessionTimeoutMs?: number;
     maxInFlight?: number;
@@ -23,11 +26,24 @@ type Session = {
 
 /** One process, one isolated MCP server per session. No child processes. */
 export async function startHttpServer(options: HttpOptions = {}) {
-    const { port = 38473, maxSessions = 64, sessionTimeoutMs = 600000, maxInFlight = 64, token } = options;
+    const { host = "127.0.0.1", allowedHosts = [], port = 38473, maxSessions = 64, sessionTimeoutMs = 600000, maxInFlight = 64, token } = options;
     for (const value of [maxSessions, sessionTimeoutMs, maxInFlight]) {
         if (!Number.isSafeInteger(value) || value < 1) throw new Error("Invalid HTTP limits");
     }
     if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("Invalid port");
+    if (!isIP(host)) throw new Error("MCP_HTTP_HOST must be an IP address");
+    const loopback = host === "::1" || /^127\./.test(host);
+    if (!loopback && (!token?.trim() || !allowedHosts.length)) {
+        throw new Error("External binding requires MCP_HTTP_TOKEN and MCP_HTTP_ALLOWED_HOSTS");
+    }
+    const normalizeHost = (value: string) => value.toLowerCase().replace(/^\[|\]$/g, "");
+    for (const name of allowedHosts) {
+        const normalized = normalizeHost(name);
+        if (!isIP(normalized) && !/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/.test(normalized)) {
+            throw new Error("Allowed hosts must be hostnames or IP addresses without schemes, ports or wildcards");
+        }
+    }
+    const trustedHosts = new Set(["127.0.0.1", "localhost", "::1", ...(loopback ? [host] : []), ...allowedHosts].map(normalizeHost));
     const sessions = new Map<string, Session>();
     // Includes sessions whose initialization has not completed yet.
     const live = new Set<Session>();
@@ -42,7 +58,7 @@ export async function startHttpServer(options: HttpOptions = {}) {
     app.use((req, res, next) => {
         // Native MCP clients need no browser Origin. Reject browser access and
         // untrusted Host headers even on loopback (DNS rebinding protection).
-        if (!["127.0.0.1", "localhost", "[::1]"].includes(req.hostname) || req.headers.origin !== undefined) {
+        if (!trustedHosts.has(normalizeHost(req.hostname)) || req.headers.origin !== undefined) {
             fail(res, 403, "Host or Origin not allowed");
             return;
         }
@@ -149,7 +165,7 @@ export async function startHttpServer(options: HttpOptions = {}) {
     http.headersTimeout = 10000;
     await new Promise<void>((resolve, reject) => {
         http.once("error", reject);
-        http.listen(port, "127.0.0.1", () => { http.off("error", reject); resolve(); });
+        http.listen(port, host, () => { http.off("error", reject); resolve(); });
     });
     const address = http.address();
     if (!address || typeof address === "string") throw new Error("Missing HTTP address");
@@ -164,7 +180,7 @@ export async function startHttpServer(options: HttpOptions = {}) {
     timer.unref();
     let closePromise: Promise<void> | undefined;
     return {
-        url: `http://127.0.0.1:${address.port}/mcp`,
+        url: `http://${isIP(host) === 6 ? `[${host}]` : host}:${address.port}/mcp`,
         get sessionCount() { return live.size; },
         close() {
             return closePromise ??= (async () => {

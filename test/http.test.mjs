@@ -172,3 +172,31 @@ test('collection size is bounded without changing existing entries', async t => 
     const replacement = await call(client, 'collect_selected_blocks', { blockName: 'replacement', blockType: 'type-0', action: 'add' });
     assert.equal(payload(replacement).totalBlocks, 100);
 });
+
+test('external bind requires credentials and explicit hosts, and enforces them', async t => {
+    await assert.rejects(startHttpServer({ port: 0, host: '0.0.0.0' }));
+    await assert.rejects(startHttpServer({ port: 0, host: '0.0.0.0', token: 'test' }));
+    await assert.rejects(startHttpServer({ port: 0, host: '0.0.0.0', token: ' ', allowedHosts: ['mcp.example.com'] }));
+    await assert.rejects(startHttpServer({ port: 0, host: 'invalid' }));
+    await assert.rejects(startHttpServer({ port: 0, allowedHosts: ['*'] }));
+    await assert.rejects(startHttpServer({ port: 0, allowedHosts: ['https://example.com'] }));
+    const service = await startHttpServer({ port: 0, host: '0.0.0.0', token: 'test', allowedHosts: ['mcp.example.com'] });
+    t.after(() => service.close());
+    const url = service.url.replace('0.0.0.0', '127.0.0.1');
+    async function withHost(host, token) {
+        return new Promise((resolve, reject) => {
+            const req = request(url, { method: 'POST', headers: {
+                Host: host, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
+                Accept: 'application/json, text/event-stream',
+            } }, res => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+            req.on('error', reject); req.end(JSON.stringify(initialize));
+        });
+    }
+    assert.equal(await withHost('mcp.example.com', 'test'), 200);
+    assert.equal(await withHost('mcp.example.com', 'wrong'), 401);
+    assert.equal(await withHost('other.example.com', 'test'), 403);
+    assert.equal(service.sessionCount, 1);
+    const env = httpOptionsFromEnv({ MCP_HTTP_HOST: '0.0.0.0', MCP_HTTP_ALLOWED_HOSTS: ' mcp.example.com, 192.0.2.10 ' });
+    assert.equal(env.host, '0.0.0.0');
+    assert.deepEqual(env.allowedHosts, ['mcp.example.com', '192.0.2.10']);
+});

@@ -12,7 +12,7 @@ test('HTTP CLI serves 24 clients without child processes and exits on SIGTERM', 
     const port = reservation.address().port;
     await new Promise(resolve => reservation.close(resolve));
     const child = spawn(process.execPath, ['build/index.js', '--transport=streamable-http'], {
-        env: { ...process.env, MCP_HTTP_PORT: String(port), MCP_HTTP_TOKEN: '', API_KEY: '', EMAIL: '',
+        env: { ...process.env, MCP_HTTP_HOST: '127.0.0.1', MCP_HTTP_ALLOWED_HOSTS: '', MCP_HTTP_PORT: String(port), MCP_HTTP_TOKEN: '', API_KEY: '', EMAIL: '',
             MCP_HTTP_MAX_SESSIONS: '64', MCP_HTTP_MAX_IN_FLIGHT: '64', MCP_HTTP_SESSION_TIMEOUT_MS: '600000' },
         stdio: ['ignore', 'pipe', 'pipe'],
     });

@@ -141,26 +141,131 @@ Do not interleave `collect_*` / generate / clear workflows on the same session.
 
 | Server environment variable | Default | Meaning |
 | --- | --- | --- |
-| `MCP_HTTP_PORT` | `38473` | Loopback listening port |
+| `MCP_HTTP_HOST` | `127.0.0.1` | Bind IP address; `0.0.0.0` for all IPv4 interfaces, `::` for IPv6 |
+| `MCP_HTTP_ALLOWED_HOSTS` | unset | Comma-separated request hostnames/IPs; required for non-loopback binding |
+| `MCP_HTTP_PORT` | `38473` | Listening port |
 | `MCP_HTTP_MAX_SESSIONS` | `64` | Maximum live sessions, including initialization |
 | `MCP_HTTP_SESSION_TIMEOUT_MS` | `600000` | Idle session lifetime |
 | `MCP_HTTP_MAX_IN_FLIGHT` | `64` | Maximum open HTTP requests, including GET streams |
-| `MCP_HTTP_TOKEN` | unset | Optional HTTP bearer token (distinct from Shadcn `API_KEY`) |
+| `MCP_HTTP_TOKEN` | unset | HTTP bearer token; required for non-loopback binding, optional on loopback |
 
 Excess sessions/requests return 503; bodies are capped at 1 MiB. Each collection
 holds at most 100 entries. Upstream HTTP requests have a 30-second deadline.
 Resource use still grows with session objects and response sizes; it does not
 multiply a full Node runtime per session.
 
-The service binds only to `127.0.0.1`, checks Host and rejects browser Origin
-headers. No CORS, remote bind, legacy SSE or OAuth service is provided. For remote
-access, use an authenticated TLS reverse proxy that preserves an allowed local
-Host header and configure `MCP_HTTP_TOKEN`. Do not expose an unauthenticated proxy.
+The service defaults to loopback, checks Host and rejects browser Origin
+headers. Non-loopback binding requires both a bearer token and an explicit host
+allowlist. No CORS, built-in TLS, legacy SSE or OAuth service is provided.
 
 When using a token, Codex can set `bearer_token_env_var = "MCP_HTTP_TOKEN"` in the
 server entry (export that variable in the client environment as well). Other
 clients can send `Authorization: Bearer <token>` using their `headers` setting.
 The token is shared by this deployment, not a per-session account identity.
+
+### Bind to another address or port
+
+To change only the local port:
+
+```bash
+MCP_HTTP_PORT=38474 npm run start:http
+```
+
+To listen on all IPv4 interfaces, set the token and hostnames/IPs that clients
+will actually use. Replace the example hostname/IP below with your own:
+
+```bash
+export MCP_HTTP_TOKEN="$(openssl rand -hex 32)"
+MCP_HTTP_HOST=0.0.0.0 \
+MCP_HTTP_PORT=38473 \
+MCP_HTTP_ALLOWED_HOSTS=mcp.example.com,192.0.2.10 \
+npm run start:http
+```
+
+Use `MCP_HTTP_HOST=::` for an IPv6 wildcard bind, or a specific interface IP to
+limit listening to that interface. Hostnames are not accepted as bind addresses.
+Clients must use the reachable server hostname/IP, **not** `0.0.0.0` or `::`, in
+their URLs. All remote clients must send the configured bearer token.
+
+`MCP_HTTP_ALLOWED_HOSTS` contains exact hostnames or IP addresses without schemes,
+ports, paths or wildcards. Localhost/loopback request hosts remain accepted, but
+token authentication still applies. A missing token/allowlist prevents external
+startup; an unlisted Host or any browser Origin receives 403. Behind a proxy,
+allow the Host it forwards; `X-Forwarded-Host` is not trusted.
+
+Binding does not open a firewall or enable TLS. Restrict firewall access to your
+clients and use HTTPS through a TLS reverse proxy or an SSH tunnel for traffic
+over untrusted networks. For Docker bridge networking, bind to `0.0.0.0` inside
+the container and publish the chosen port; the token and allowlist are still
+required. HTTP mode never launches additional stdio servers.
+
+### Run with systemd (Linux user service)
+
+The repository includes [a user unit](deploy/shadcn-studio-mcp.service) and
+[an environment-file template](deploy/server.env.example). Run the commands below
+as the account that will own the service. These commands install the fork in
+`~/.local/share/shadcn-mcp-server`; if that directory already exists, update the
+existing checkout instead of cloning over it.
+
+```bash
+mkdir -p ~/.local/share
+git clone --branch feat/streamable-http https://github.com/kkyubrother/shadcn-mcp-server.git ~/.local/share/shadcn-mcp-server
+cd ~/.local/share/shadcn-mcp-server
+npm ci
+npm run build
+
+install -d -m 700 ~/.config/shadcn-studio-mcp
+install -d ~/.config/systemd/user
+# First installation only: preserve your existing server.env on later updates.
+install -m 600 deploy/server.env.example ~/.config/shadcn-studio-mcp/server.env
+install -m 644 deploy/shadcn-studio-mcp.service ~/.config/systemd/user/shadcn-studio-mcp.service
+```
+
+Edit `~/.config/shadcn-studio-mcp/server.env` to choose the bind address, port,
+allowlist, optional Pro credentials and HTTP token. For external binding, generate
+a token with `openssl rand -hex 32` and paste it as the literal `MCP_HTTP_TOKEN`
+value. An `EnvironmentFile` is not a shell script: do not use `export`, `$VAR` or
+`$(...)` in it. Do not commit the populated file.
+
+Check `command -v node`. The unit assumes `/usr/bin/node`; replace `ExecStart`'s
+executable with the absolute path of your Node.js 20.3+ executable if different.
+For nvm/asdf installations, systemd does not load your interactive shell setup.
+If using another checkout directory, update both `WorkingDirectory` and the
+`build/index.js` path in `ExecStart`.
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now shadcn-studio-mcp.service
+systemctl --user status shadcn-studio-mcp.service
+journalctl --user -u shadcn-studio-mcp.service -n 50 --no-pager
+```
+
+The unit restarts the process on failure and sends SIGTERM on stop so sessions
+can close. To keep the user service running after logout and start it at boot,
+enable lingering for that account (this may require administrator privileges):
+
+```bash
+sudo loginctl enable-linger "$USER"
+```
+
+After changing `server.env` or rebuilding the checkout:
+
+```bash
+systemctl --user restart shadcn-studio-mcp.service
+```
+
+After editing the unit, run `systemctl --user daemon-reload` before restarting.
+To stop the service and disable automatic startup:
+
+```bash
+systemctl --user disable --now shadcn-studio-mcp.service
+```
+
+Connect clients to the same `/mcp` URL as above, using the configured port and
+server address. A user unit runs as your account and must not be installed under
+`/etc/systemd/system` unchanged. See systemd's
+[EnvironmentFile reference](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#EnvironmentFile=)
+and [lingering reference](https://www.freedesktop.org/software/systemd/man/latest/loginctl.html#enable-linger%20USER%E2%80%A6).
 
 ### Development
 
