@@ -307,6 +307,96 @@ server address. A user unit runs as your account and must not be installed under
 [EnvironmentFile reference](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#EnvironmentFile=)
 and [lingering reference](https://www.freedesktop.org/software/systemd/man/latest/loginctl.html#enable-linger%20USER%E2%80%A6).
 
+### Troubleshooting: `Failed to connect to bus: No such file or directory`
+
+If `systemctl --user daemon-reload` prints this error, it cannot reach the
+account's user service manager/bus. This is not an MCP server error. It can occur
+in root, `su` or minimal/container sessions without a working user service bus;
+running as root does not itself guarantee that `systemctl --user` will work.
+
+Check the init process and Node executable:
+
+```bash
+ps -p 1 -o comm=
+command -v node
+```
+
+If PID 1 is not `systemd`, these systemd instructions do not apply. Use the
+container's foreground command (`node build/index.js --transport=streamable-http`)
+or its process supervisor instead. If PID 1 is `systemd`, a root installation can
+use a **system service**, without `--user`, as shown below.
+
+#### Alternative: system service for an existing root installation
+
+Run the following in a root shell. This example runs the service as root and
+assumes the checkout is `/root/.local/share/shadcn-mcp-server` and the populated
+environment file is `/root/.config/shadcn-studio-mcp/server.env`. Build the checkout
+first (`npm ci && npm run build`) and create/edit the environment file using the
+settings described above. Preserve an existing environment file when updating.
+For an installation owned by another account, use that account's paths and set
+`User=` in the unit accordingly.
+
+Confirm the required files and executable exist before registering:
+
+```bash
+test -f /root/.local/share/shadcn-mcp-server/build/index.js
+test -f /root/.config/shadcn-studio-mcp/server.env
+command -v node
+```
+
+If either file check fails, finish the build or environment-file setup first.
+Then create the system unit (this replaces a unit with the same name):
+
+```bash
+MCP_NODE_BIN="$(command -v node)"
+
+cat > /etc/systemd/system/shadcn-studio-mcp.service <<EOF
+[Unit]
+Description=Shadcn Studio MCP Server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.local/share/shadcn-mcp-server
+ExecStart=${MCP_NODE_BIN} /root/.local/share/shadcn-mcp-server/build/index.js --transport=streamable-http
+EnvironmentFile=/root/.config/shadcn-studio-mcp/server.env
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=40
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+chmod 600 /root/.config/shadcn-studio-mcp/server.env
+systemctl daemon-reload
+systemctl enable --now shadcn-studio-mcp.service
+systemctl status shadcn-studio-mcp.service
+journalctl -u shadcn-studio-mcp.service -n 50 --no-pager
+```
+
+The shell writes the resolved Node path into `ExecStart`; update it if you later
+remove or change that Node installation. Choose either the user service or the
+system service, not both on the same port. If a user service was previously
+started, stop and disable it through that account's working user manager first.
+The system service does not require `loginctl enable-linger`.
+
+After changing credentials or rebuilding, use:
+
+```bash
+systemctl restart shadcn-studio-mcp.service
+```
+
+After changing the system unit, run `systemctl daemon-reload` before restarting.
+To stop it and disable startup, use `systemctl disable --now shadcn-studio-mcp.service`.
+All commands for this alternative omit `--user`; the `MCP_HTTP_*` binding and
+authentication settings are otherwise unchanged.
+
 ### Development
 
 ```bash
