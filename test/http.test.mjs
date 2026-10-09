@@ -133,7 +133,7 @@ test('stdio still exposes the same tools without an HTTP listener', async t => {
 });
 
 test('environment configuration rejects invalid limits', () => {
-    assert.equal(httpOptionsFromEnv({}).port, 3000);
+    assert.equal(httpOptionsFromEnv({}).port, 38473);
     for (const value of ['0', '-1', 'abc', '1.5', 'Infinity']) {
         assert.throws(() => httpOptionsFromEnv({ MCP_HTTP_MAX_SESSIONS: value }));
     }

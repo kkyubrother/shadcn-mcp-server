@@ -1,12 +1,10 @@
-# Shadcn Studio MCP Server
+# Shadcn Studio MCP Server — Streamable HTTP fork
 
-Build modern, production-ready UI blocks, components, and full pages in minutes using Shadcn Studio. Seamlessly integrates with your favorite IDE and supports the most popular frameworks like React, Next.js.
-
-## 🚀 What is Shadcn Studio MCP Server?
-
-Shadcn Studio MCP Server is a [Shadcn AI](https://shadcnstudio.com/mcp) builder that helps you create, inspire, refine, and convert Figma designs into stunning, production-ready blocks, UI components, and full pages using Shadcn Studio blocks. It easily integrates directly into your favorite IDE for a fast & efficient workflow.
-
-Try Shadcn Studio MCP Server for free today.
+A fork of [shadcnstudio/shadcn-mcp-server](https://github.com/shadcnstudio/shadcn-mcp-server)
+that lets Claude Code, Codex, OpenCode and Antigravity connect to one shared local
+HTTP server. It retrieves Shadcn Studio instructions, metadata and component code,
+manages selections, and returns installation commands for your agent to execute.
+Existing stdio usage remains supported.
 
 ## Streamable HTTP (this fork)
 
@@ -27,7 +25,7 @@ npm run build
 npm run start:http
 ```
 
-The endpoint is `http://127.0.0.1:3000/mcp`. Keep this single server running and
+The endpoint is `http://127.0.0.1:38473/mcp`. Keep this single server running and
 configure each client with its URL. Do not launch a copy for each client.
 
 For Pro features, set `API_KEY` and `EMAIL` in the **server process environment**.
@@ -37,12 +35,58 @@ use the same Shadcn account; this is not a multi-tenant credential service.
 
 ### Client configuration
 
+Start the server above before connecting. If you changed `MCP_HTTP_PORT`, use
+that port in every client URL. The default `38473` avoids common development
+ports but is not reserved; choose another port if it is already in use.
+Replace existing stdio entries instead of keeping a second copy under another name.
+
+#### Claude Code
+
+Register the running HTTP server for your user (all projects):
+
+```bash
+claude mcp add --transport http --scope user shadcn-studio-mcp http://127.0.0.1:38473/mcp
+```
+
+If the same name is already registered with `--scope user` using stdio, remove
+that entry first, then run the HTTP registration command above:
+
+```bash
+claude mcp remove --scope user shadcn-studio-mcp
+```
+
+If your old entry is project- or local-scoped, update that scope instead; a
+higher-priority entry can override the user-scoped server. Use `--scope project`
+in place of `--scope user` to save configuration in the project's `.mcp.json`.
+
+When the server uses `MCP_HTTP_TOKEN`, use this registration command instead.
+Export the same token in the terminal where you run this command:
+
+```bash
+claude mcp add \
+  --header "Authorization: Bearer ${MCP_HTTP_TOKEN:?Set the server token first}" \
+  --transport http --scope user \
+  shadcn-studio-mcp http://127.0.0.1:38473/mcp
+```
+
+The shell expands the token before registration, so this stores its value in
+Claude Code's MCP configuration. This token authenticates to your local server;
+Shadcn `API_KEY` and `EMAIL` belong in the server environment.
+
+Check registration with `claude mcp get shadcn-studio-mcp`, and use `/mcp` inside
+Claude Code to check the connection and available tools. This server does not
+provide OAuth login. See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
+
+#### Codex
+
 Codex (`~/.codex/config.toml`):
 
 ```toml
 [mcp_servers.shadcn-studio-mcp]
-url = "http://127.0.0.1:3000/mcp"
+url = "http://127.0.0.1:38473/mcp"
 ```
+
+#### OpenCode
 
 OpenCode (`~/.config/opencode/opencode.json`, merge into existing settings):
 
@@ -51,7 +95,7 @@ OpenCode (`~/.config/opencode/opencode.json`, merge into existing settings):
   "mcp": {
     "shadcn-studio-mcp": {
       "type": "remote",
-      "url": "http://127.0.0.1:3000/mcp",
+      "url": "http://127.0.0.1:38473/mcp",
       "oauth": false,
       "enabled": true
     }
@@ -59,20 +103,22 @@ OpenCode (`~/.config/opencode/opencode.json`, merge into existing settings):
 }
 ```
 
+#### Antigravity
+
 Antigravity (MCP Servers → Manage MCP Servers → View raw config):
 
 ```json
 {
   "mcpServers": {
     "shadcn-studio-mcp": {
-      "serverUrl": "http://127.0.0.1:3000/mcp"
+      "serverUrl": "http://127.0.0.1:38473/mcp"
     }
   }
 }
 ```
 
 These are configuration examples. Automated interoperability tests use the
-official MCP TypeScript client; individual desktop clients and Pro API access
+official MCP TypeScript client; individual client applications and Pro API access
 need separate acceptance testing.
 
 ### Session isolation and limits
@@ -95,7 +141,7 @@ Do not interleave `collect_*` / generate / clear workflows on the same session.
 
 | Server environment variable | Default | Meaning |
 | --- | --- | --- |
-| `MCP_HTTP_PORT` | `3000` | Loopback listening port |
+| `MCP_HTTP_PORT` | `38473` | Loopback listening port |
 | `MCP_HTTP_MAX_SESSIONS` | `64` | Maximum live sessions, including initialization |
 | `MCP_HTTP_SESSION_TIMEOUT_MS` | `600000` | Idle session lifetime |
 | `MCP_HTTP_MAX_IN_FLIGHT` | `64` | Maximum open HTTP requests, including GET streams |
@@ -128,41 +174,30 @@ calls, deletion, expiry, capacity, malformed requests, authentication, Host/Orig
 validation and stdio compatibility. Tests use local-only tools and do not require
 credentials or call Shadcn Studio's API.
 
-## 🛠️ Installation
+## Optional: stdio from this fork
 
-We've made installation super easy!
+After building this checkout, omit `--transport` (or set `--transport=stdio`):
 
-1. Access the [Installation Guide](https://shadcnstudio.com/mcp/onboarding) and select your IDE (VS Code, Cursor, Windsurf, etc.).
-2. Follow the step-by-step instructions to set up the MCP Server in your IDE.
-3. Start using Shadcn Studio MCP Server for **free**.
-
-### Quick Setup (npx)
-
-```json
-{
-  "mcpServers": {
-    "shadcn-studio-mcp": {
-      "command": "npx",
-      "args": ["-y", "shadcn-studio-mcp"]
-    }
-  }
-}
+```bash
+node /absolute/path/to/shadcn-mcp-server/build/index.js
 ```
 
-### Pro Users (with API Key & Email)
+For example, Claude Code can start this checkout directly:
 
-```json
-{
-  "mcpServers": {
-    "shadcn-studio-mcp": {
-      "command": "npx",
-      "args": ["-y", "shadcn-studio-mcp", "API_KEY=your-api-key", "EMAIL=your@email.com"]
-    }
-  }
-}
+```bash
+claude mcp add --transport stdio --scope user shadcn-studio-mcp -- \
+  node /absolute/path/to/shadcn-mcp-server/build/index.js
 ```
 
-> **Note:** For freemium features, no credentials are needed. For pro features, both `API_KEY` and `EMAIL` are required.
+Choose this instead of HTTP registration, not in addition to it. A stdio entry
+starts a local server process according to the client's lifecycle; it does not
+connect to the shared HTTP service. Pro credentials can be supplied through the
+server environment or existing `API_KEY=...` and `EMAIL=...` arguments.
+
+`npx -y shadcn-studio-mcp` installs the upstream npm release, **not this fork**.
+The [upstream installation guide](https://shadcnstudio.com/mcp/onboarding) applies
+to that release. Free features need no credentials; Pro features need both
+`API_KEY` and `EMAIL`.
 
 ## 📒 Documentation
 
@@ -172,7 +207,13 @@ For detailed documentation on how to use Shadcn Studio MCP Server, please refer 
 
 ## 🔧 Usage
 
-Shadcn Studio MCP Server provides four main workflows:
+The tools support four main workflows. The `/cui`, `/iui`, `/rui` and `/ftc`
+shortcuts below require separate client command/skill setup; registering this MCP
+server does not install them. Without shortcuts, ask your agent directly, for
+example: "Use shadcn-studio-mcp to create a hero section for my SaaS landing page."
+Figma-to-code additionally requires access to a Figma MCP server.
+
+Workflow shortcuts (after configuring them):
 
 | Command | Description | Use Case |
 |---------|-------------|----------|

@@ -23,7 +23,7 @@ type Session = {
 
 /** One process, one isolated MCP server per session. No child processes. */
 export async function startHttpServer(options: HttpOptions = {}) {
-    const { port = 3000, maxSessions = 64, sessionTimeoutMs = 600000, maxInFlight = 64, token } = options;
+    const { port = 38473, maxSessions = 64, sessionTimeoutMs = 600000, maxInFlight = 64, token } = options;
     for (const value of [maxSessions, sessionTimeoutMs, maxInFlight]) {
         if (!Number.isSafeInteger(value) || value < 1) throw new Error("Invalid HTTP limits");
     }

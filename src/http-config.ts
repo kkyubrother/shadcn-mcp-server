@@ -10,7 +10,7 @@ export function httpOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): HttpOp
         return value;
     };
     return {
-        port: integer("MCP_HTTP_PORT", 3000, 65535),
+        port: integer("MCP_HTTP_PORT", 38473, 65535),
         maxSessions: integer("MCP_HTTP_MAX_SESSIONS", 64, 10000),
         sessionTimeoutMs: integer("MCP_HTTP_SESSION_TIMEOUT_MS", 600000, 2147483647),
         maxInFlight: integer("MCP_HTTP_MAX_IN_FLIGHT", 64, 10000),
