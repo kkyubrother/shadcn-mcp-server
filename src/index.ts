@@ -4,7 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { apiGet } from "./utils/http-client.js";
 import { handleMcpError } from "./utils/errors.js";
-import { formatThemeName } from "./utils/validation.js";
+import { formatThemeName, toRegistryItem, REGISTRY_STYLE } from "./utils/validation.js";
 
 const server = new McpServer({
     name: "shadcn-studio MCP Server",
@@ -31,7 +31,7 @@ const installCommand = (items: string[]) => `npx shadcn@latest add ${items.join(
 // or once an install command has been generated
 const COLLECTION_TIMEOUT_MS = 10 * 60 * 1000;
 
-function createCollection(noun: "block" | "component", namespace: string) {
+function createCollection(noun: "block" | "component") {
     const Noun = noun[0].toUpperCase() + noun.slice(1);
     const listKey = `collected${Noun}s`;
     const totalKey = `total${Noun}s`;
@@ -103,18 +103,16 @@ function createCollection(noun: "block" | "component", namespace: string) {
                 });
             }
 
-            // Names that already carry a namespace (e.g. @ss-blocks/ from FTC) are used as-is
-            const names = items.map(({ [`${noun}Name`]: itemName }) =>
-                itemName.startsWith("@") ? itemName : `${namespace}${itemName}`
-            );
+            // Add the @shadcn-studio/ namespace, rewriting legacy @ss-blocks/ / @ss-components/ names
+            const names = items.map(({ [`${noun}Name`]: itemName }) => toRegistryItem(itemName));
             reset();
             return text(installCommand(names));
         },
     };
 }
 
-const blocks = createCollection("block", "@ss-blocks/");
-const components = createCollection("component", "@ss-components/");
+const blocks = createCollection("block");
+const components = createCollection("component");
 
 // Instructions for IDE agent to generate/create/update shadcn/studio blocks.
 server.registerTool(
@@ -177,7 +175,7 @@ server.registerTool(
     {
         title: "Parse Figma Component Names (FIGMA-TO-CODE WORKFLOW)",
         description:
-            "FOR FIGMA-TO-CODE WORKFLOW (/ftc): Parse Figma component instance names and convert them to proper Shadcn Studio block format for installation. Converts names like 'Pro Blocks / Marketing-ui / features-section / Feature 01' to '@ss-blocks/feature-01' or 'Free Blocks / Marketing-ui / features-section / Feature 01' to '@ss-blocks/feature-01' Use this tool after getting component list from Figma MCP. DO NOT use for create-ui, inspire-ui, or refine-ui workflows.",
+            "FOR FIGMA-TO-CODE WORKFLOW (/ftc): Parse Figma component instance names and convert them to proper Shadcn Studio block format for installation. Converts names like 'Pro Blocks / Marketing-ui / features-section / Feature 01' to '@shadcn-studio/feature-01' or 'Free Blocks / Marketing-ui / features-section / Feature 01' to '@shadcn-studio/feature-01' Use this tool after getting component list from Figma MCP. DO NOT use for create-ui, inspire-ui, or refine-ui workflows.",
         inputSchema: {
             figmaComponents: z.array(z.string()).describe("Array of Figma component instance names from Figma MCP (e.g., ['Pro Blocks / Marketing-ui / features-section / Feature 01', 'Pro Blocks / Marketing-ui / hero-section / Hero 03'])"),
         },
@@ -202,7 +200,7 @@ server.registerTool(
             return {
                 original: componentName,
                 blockName,
-                namespace: `@ss-blocks/${blockName}`,
+                namespace: toRegistryItem(blockName),
                 category: parts.length > 2 && parts[parts.length - 2],
             };
         });
@@ -312,7 +310,7 @@ server.registerTool(
             "FOR REFINE WORKFLOW ONLY: If a component was found from get-component-meta-content tool, this tool fetches the component content and generates the shadcn CLI installation command for that component. If no suitable component is found, this tool will help create/update components according to the user query. This returns the exact command that should be executed to install the components. This tool is ONLY for the refine workflow (/rui). DO NOT use this for create-ui workflow - use get-block-content instead.",
         inputSchema: { endpoint: z.string() },
     },
-    ({ endpoint }) => fetchJson(`/r/components/${endpoint}.json`)
+    ({ endpoint }) => fetchJson(`/r/${REGISTRY_STYLE}/${endpoint}.json`)
 );
 
 server.registerTool(
@@ -379,7 +377,7 @@ server.registerTool(
     },
     async ({ themeName }) => {
         const formattedThemeName = formatThemeName(themeName);
-        const themeNamespace = `@ss-themes/${formattedThemeName}`;
+        const themeNamespace = toRegistryItem(formattedThemeName);
 
         return json({
             success: true,
