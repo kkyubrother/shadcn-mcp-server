@@ -3,53 +3,37 @@ export interface Config {
     email?: string;
 }
 
+const keyValuePatterns = [
+    /^([A-Z_]+)=(.+)$/, // API_KEY=value format
+    /^--([A-Z_]+)=(.+)$/, // --API_KEY=value format
+    /^\/([A-Z_]+):(.+)$/, // /API_KEY:value format (Windows style)
+    /^-([A-Z_]+)[ =](.+)$/, // -API_KEY value or -API_KEY=value format
+];
+
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
 const parseArguments = (): Config => {
-    const config: Config = {};
+    // Environment variables first; command line arguments override them
+    const config: Config = { apiKey: process.env.SHADCN_STUDIO_API_KEY, email: process.env.SHADCN_STUDIO_EMAIL };
 
-    // First, check environment variables
-    if (process.env.SHADCN_STUDIO_API_KEY) {
-        config.apiKey = process.env.SHADCN_STUDIO_API_KEY;
-    }
+    for (const arg of process.argv) {
+        const match = keyValuePatterns.map((pattern) => arg.match(pattern)).find(Boolean);
+        if (!match) continue;
 
-    if (process.env.SHADCN_STUDIO_EMAIL) {
-        config.email = process.env.SHADCN_STUDIO_EMAIL;
-    }
+        const [, key, value] = match;
+        // Strip surrounding quotes from the value
+        const cleanValue = value.replaceAll('"', "").replaceAll("'", "");
 
-    // Command line arguments override environment variables
-    process.argv.forEach((arg) => {
-        const keyValuePatterns = [
-            /^([A-Z_]+)=(.+)$/, // API_KEY=value format
-            /^--([A-Z_]+)=(.+)$/, // --API_KEY=value format
-            /^\/([A-Z_]+):(.+)$/, // /API_KEY:value format (Windows style)
-            /^-([A-Z_]+)[ =](.+)$/, // -API_KEY value or -API_KEY=value format
-        ];
-
-        // Email regex pattern
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-
-        for (const pattern of keyValuePatterns) {
-            const match = arg.match(pattern);
-            if (match) {
-                const [, key, value] = match;
-
-                // Strip surrounding quotes from the value
-                const cleanValue = value.replaceAll('"', "").replaceAll("'", "");
-
-                if (key === "API_KEY") {
-                    config.apiKey = cleanValue;
-                    break;
-                } else if (key === "EMAIL") {
-                    // Check if the value matches the email regex pattern
-                    if (emailRegex.test(cleanValue)) {
-                        config.email = cleanValue;
-                    } else {
-                        console.error(`Invalid email format: ${cleanValue}`);
-                    }
-                    break;
-                }
+        if (key === "API_KEY") {
+            config.apiKey = cleanValue;
+        } else if (key === "EMAIL") {
+            if (emailRegex.test(cleanValue)) {
+                config.email = cleanValue;
+            } else {
+                console.error(`Invalid email format: ${cleanValue}`);
             }
         }
-    });
+    }
 
     return config;
 };
@@ -58,8 +42,5 @@ export const config = parseArguments();
 
 /**
  * Check if user has pro credentials (both API key and email provided)
- * Returns true for pro users, false for freemium users
  */
-export const isPro = (): boolean => {
-    return !!(config.apiKey && config.email);
-};
+export const isPro = (): boolean => !!(config.apiKey && config.email);

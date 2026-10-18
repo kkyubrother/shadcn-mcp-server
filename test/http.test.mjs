@@ -44,9 +44,9 @@ test('concurrent clients isolate both collections; DELETE only removes its own s
         assert.deepEqual(payload(await call(client, 'collect_selected_components', component('', 'list'))).collectedComponents,
             [{ componentName: `button-${i}`, componentType: 'button' }]);
         assert.equal((await call(client, 'get_add_command_for_items')).content[0].text,
-            `npx shadcn@latest add @ss-blocks/hero-${i}`);
+            `npx shadcn@latest add @shadcn-studio/hero-${i}`);
         assert.equal((await call(client, 'get_add_command_for_components')).content[0].text,
-            `npx shadcn@latest add @ss-components/button-${i}`);
+            `npx shadcn@latest add @shadcn-studio/button-${i}`);
         assert.equal(payload(await call(client, 'collect_selected_blocks', block('', 'list'))).totalBlocks, 0);
     }));
     const oldId = peers[0].transport.sessionId;

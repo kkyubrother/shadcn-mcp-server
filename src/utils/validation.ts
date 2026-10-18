@@ -1,54 +1,21 @@
 import { z } from "zod";
 import { createValidationError } from "./errors.js";
 
-/**
- * Essential validation schemas only
- */
-export const ValidationSchemas = {
-  apiEndpoint: z.string().min(1).regex(/^\//),
-  email: z.string().email(),
-  apiKey: z.string().min(10),
-};
+export function validateCredentials(apiKey?: string, email?: string): void {
+  const errors: string[] = [];
+  if (!z.string().min(10).safeParse(apiKey).success) errors.push('Invalid API key');
+  if (!z.string().email().safeParse(email).success) errors.push('Invalid email');
 
-/**
- * Optimized validator class
- */
-export class Validator {
-  static validateCredentials(apiKey?: string, email?: string): { apiKey: string; email: string } {
-    const errors: string[] = [];
-
-    try { ValidationSchemas.apiKey.parse(apiKey); }
-    catch { errors.push('Invalid API key'); }
-
-    try { ValidationSchemas.email.parse(email); }
-    catch { errors.push('Invalid email'); }
-
-    if (errors.length > 0) {
-      throw createValidationError(`Invalid credentials: ${errors.join(', ')}`);
-    }
-
-    return { apiKey: apiKey!, email: email! };
-  }
-
-  static validateHttpResponse(status: number, endpoint: string): void {
-    if (status >= 400) {
-      const message = status >= 500 ? 'Server Error' :
-        status === 404 ? 'Not Found' :
-          status === 401 ? 'Unauthorized' :
-            'Bad Request';
-
-      throw createValidationError(`${message} (${status}) for endpoint: ${endpoint}`);
-    }
+  if (errors.length > 0) {
+    throw createValidationError(`Invalid credentials: ${errors.join(', ')}`);
   }
 }
-
 
 /**
  * Format theme name from user input to proper theme name
  * Examples: "Modern Minimal" -> "modern-minimal", "Dark Blue" -> "dark-blue"
  */
 export function formatThemeName(themeName: string): string {
-  // Convert to lowercase, replace spaces with dashes, remove extra characters
   return themeName
     .toLowerCase()
     .trim()
@@ -59,12 +26,28 @@ export function formatThemeName(themeName: string): string {
 }
 
 /**
- * Determine if theme name is a public theme or private user theme
- * Public themes: simple names like "modern-minimal", "dark-blue", etc.
- * Private themes: UUID format or complex naming patterns
+ * Namespace registered for shadcn/studio in the public shadcn registry index
+ * (https://ui.shadcn.com/r/registries.json). Legacy @ss-* namespaces are not registered
+ * there, so `npx shadcn add @ss-blocks/...` fails with "Unknown registry".
  */
-export function getThemeNamespace(themeName: string): string {
-  const formattedName = formatThemeName(themeName);
+const REGISTRY_NAMESPACE = "@shadcn-studio";
 
-  return `@ss-themes/${formattedName}`;
+/**
+ * Registry style used when fetching items directly (/r/{style}/{name}.json)
+ */
+export const REGISTRY_STYLE = "new-york-v4";
+
+const LEGACY_NAMESPACE_PATTERN = /^@ss-(blocks|components|themes)\//;
+
+/**
+ * Convert an item name to an installable registry item
+ * Examples: "hero-section-01" -> "@shadcn-studio/hero-section-01",
+ *           "@ss-blocks/hero-section-01" -> "@shadcn-studio/hero-section-01"
+ */
+export function toRegistryItem(name: string): string {
+  const trimmed = name.trim();
+  if (LEGACY_NAMESPACE_PATTERN.test(trimmed)) {
+    return trimmed.replace(LEGACY_NAMESPACE_PATTERN, `${REGISTRY_NAMESPACE}/`);
+  }
+  return trimmed.startsWith("@") ? trimmed : `${REGISTRY_NAMESPACE}/${trimmed}`;
 }
