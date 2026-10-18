@@ -2,7 +2,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { API_KEY, EMAIL } from "./utils/http-client.js";
 import { apiClient } from "./utils/http-client.js";
 import { handleMcpError } from "./utils/errors.js";
 import { Validator, formatThemeName, getThemeNamespace } from "./utils/validation.js";
@@ -10,7 +9,7 @@ import { Validator, formatThemeName, getThemeNamespace } from "./utils/validatio
 // Create server instance
 const server = new McpServer({
     name: "shadcn-studio MCP Server",
-    version: "1.0.0",
+    version: "1.0.7",
 });
 
 
@@ -575,7 +574,7 @@ server.registerTool(
     },
     async ({ endpoint }) => {
         try {
-            const url = `/api/mcp/inspiration?blockPath=${endpoint}` + `&license_key=${API_KEY?.replace(/"/g, '')}&email=${EMAIL?.replace(/"/g, '')}`;
+            const url = `/api/mcp/inspiration?blockPath=${endpoint}`;
             const response = await apiClient.get(url);
             Validator.validateHttpResponse(response.status, url);
 
@@ -642,9 +641,7 @@ server.registerTool(
     },
     async ({ endpoint }) => {
         try {
-            const url =
-                `/r/components/${endpoint}.json` +
-                `?license_key=${API_KEY?.replace(/"/g, "")}&email=${EMAIL?.replace(/"/g, "")}`;
+            const url = `/r/components/${endpoint}.json`;
             const response = await apiClient.get(url);
 
             return {
