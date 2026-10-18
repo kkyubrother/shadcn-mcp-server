@@ -45,11 +45,10 @@ export function createNetworkError(endpoint: string, originalError: Error): Erro
 }
 
 /**
- * Create validation error from Zod
+ * Create validation error
  */
-export function createValidationError(zodError: any): Error {
-  const errors = zodError.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`);
-  const error = new Error(`Validation failed: ${errors.join(', ')}`);
+export function createValidationError(message: string): Error {
+  const error = new Error(`Validation failed: ${message}`);
   error.name = 'ValidationError';
   return error;
 }
