@@ -4,7 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { apiGet } from "./utils/http-client.js";
 import { handleMcpError } from "./utils/errors.js";
-import { formatThemeName, toRegistryItem, REGISTRY_STYLE } from "./utils/validation.js";
+import { figmaToBlockName, formatThemeName, toRegistryItem, REGISTRY_STYLE } from "./utils/validation.js";
 
 const server = new McpServer({
     name: "shadcn-studio MCP Server",
@@ -175,7 +175,7 @@ server.registerTool(
     {
         title: "Parse Figma Component Names (FIGMA-TO-CODE WORKFLOW)",
         description:
-            "FOR FIGMA-TO-CODE WORKFLOW (/ftc): Parse Figma component instance names and convert them to proper Shadcn Studio block format for installation. Converts names like 'Pro Blocks / Marketing-ui / features-section / Feature 01' to '@shadcn-studio/feature-01' or 'Free Blocks / Marketing-ui / features-section / Feature 01' to '@shadcn-studio/feature-01' Use this tool after getting component list from Figma MCP. DO NOT use for create-ui, inspire-ui, or refine-ui workflows.",
+            "FOR FIGMA-TO-CODE WORKFLOW (/ftc): Parse Figma component instance names and convert them to proper Shadcn Studio block format for installation. Converts names like 'Pro Blocks / Marketing-ui / features-section / Feature 01' to '@shadcn-studio/features-section-01' or 'Free Blocks / Marketing-ui / hero-section / Hero 3' to '@shadcn-studio/hero-section-03'. Use this tool after getting component list from Figma MCP. DO NOT use for create-ui, inspire-ui, or refine-ui workflows.",
         inputSchema: {
             figmaComponents: z.array(z.string()).describe("Array of Figma component instance names from Figma MCP (e.g., ['Pro Blocks / Marketing-ui / features-section / Feature 01', 'Pro Blocks / Marketing-ui / hero-section / Hero 03'])"),
         },
@@ -189,13 +189,10 @@ server.registerTool(
             });
         }
 
-        // "Pro Blocks / Marketing-ui / hero-section / Hero Section 04" -> "hero-section-04"
+        // "Pro Blocks / Marketing-ui / features-section / Feature 01" -> "features-section-01"
         const parsedBlocks = figmaComponents.map((componentName) => {
             const parts = componentName.split('/').map((part) => part.trim());
-            const blockName = parts[parts.length - 1]
-                .toLowerCase()
-                .replace(/\s+/g, '-')
-                .replace(/[^a-z0-9-]/g, '');
+            const blockName = figmaToBlockName(componentName);
 
             return {
                 original: componentName,
