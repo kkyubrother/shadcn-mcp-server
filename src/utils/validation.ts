@@ -51,3 +51,30 @@ export function toRegistryItem(name: string): string {
   }
   return trimmed.startsWith("@") ? trimmed : `${REGISTRY_NAMESPACE}/${trimmed}`;
 }
+
+// Sections whose block names don't start with the section slug (e.g. charts-component -> chart-component-01)
+const SECTION_BLOCK_PREFIXES: Record<string, string> = {
+  "charts-component": "chart-component",
+  "widgets-component": "widget-component",
+};
+
+/**
+ * Convert a Figma component instance name to a registry block name.
+ * Block names are "{section}-{NN}", so the section slug is taken from the path
+ * instead of the instance title, which often differs ("Feature 01" vs "features-section-01").
+ * Examples: "Pro Blocks / Marketing-ui / features-section / Feature 01" -> "features-section-01",
+ *           "Free Blocks / Marketing-ui / hero-section / Hero 3" -> "hero-section-03"
+ */
+export function figmaToBlockName(componentName: string): string {
+  const parts = componentName.split('/').map((part) => part.trim());
+  const title = parts[parts.length - 1];
+  const section = parts.length > 2 ? formatThemeName(parts[parts.length - 2]) : "";
+  const number = title.match(/(\d+)$/)?.[1];
+
+  if (!section || !number) {
+    return formatThemeName(title);
+  }
+
+  const prefix = SECTION_BLOCK_PREFIXES[section] ?? section;
+  return `${prefix}-${number.padStart(2, '0')}`;
+}
