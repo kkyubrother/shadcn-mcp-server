@@ -1,5 +1,5 @@
 import { config, isPro } from "./config.js";
-import { createApiError, createNetworkError } from "./errors.js";
+import { createApiError, createNetworkError, createValidationError } from "./errors.js";
 import { Validator, ValidationSchemas } from "./validation.js";
 
 export const API_KEY = config.apiKey;
@@ -53,7 +53,9 @@ const createMethod = (method: HttpMethod) => {
     ): Promise<{ status: number; data: T }> => {
         try {
             validateCredentialsForProUsers();
-            ValidationSchemas.apiEndpoint.parse(endpoint);
+            if (!ValidationSchemas.apiEndpoint.safeParse(endpoint).success) {
+                throw createValidationError(`Invalid endpoint: ${endpoint}`);
+            }
 
             const headers: Record<string, string> = { "Content-Type": "application/json" };
 
