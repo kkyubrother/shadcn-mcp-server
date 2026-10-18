@@ -7,6 +7,23 @@ export const EMAIL = config.email;
 
 export const BASE_URL = "https://shadcnstudio.com";
 
+/**
+ * Credential query string for endpoints that read credentials from the URL.
+ * Returns an empty string for freemium users so no "undefined" values are sent.
+ */
+export function getCredentialQuery(): string {
+    if (!isPro()) {
+        return "";
+    }
+
+    const params = new URLSearchParams({
+        license_key: API_KEY!.replace(/"/g, ""),
+        email: EMAIL!.replace(/"/g, ""),
+    });
+
+    return params.toString();
+}
+
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 interface HttpClient {

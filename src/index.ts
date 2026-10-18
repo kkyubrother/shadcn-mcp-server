@@ -2,10 +2,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { API_KEY, EMAIL } from "./utils/http-client.js";
-import { apiClient } from "./utils/http-client.js";
+import { apiClient, getCredentialQuery } from "./utils/http-client.js";
 import { handleMcpError } from "./utils/errors.js";
-import { Validator, formatThemeName, getThemeNamespace } from "./utils/validation.js";
+import { Validator, formatThemeName, getThemeNamespace, toRegistryItem, REGISTRY_STYLE } from "./utils/validation.js";
 
 // Create server instance
 const server = new McpServer({
@@ -184,7 +183,7 @@ server.registerTool(
     {
         title: "Parse Figma Component Names (FIGMA-TO-CODE WORKFLOW)",
         description:
-            "FOR FIGMA-TO-CODE WORKFLOW (/ftc): Parse Figma component instance names and convert them to proper Shadcn Studio block format for installation. Converts names like 'Pro Blocks / Marketing-ui / features-section / Feature 01' to '@ss-blocks/feature-01' or 'Free Blocks / Marketing-ui / features-section / Feature 01' to '@ss-blocks/feature-01' Use this tool after getting component list from Figma MCP. DO NOT use for create-ui, inspire-ui, or refine-ui workflows.",
+            "FOR FIGMA-TO-CODE WORKFLOW (/ftc): Parse Figma component instance names and convert them to proper Shadcn Studio block format for installation. Converts names like 'Pro Blocks / Marketing-ui / features-section / Feature 01' to '@shadcn-studio/feature-01' or 'Free Blocks / Marketing-ui / features-section / Feature 01' to '@shadcn-studio/feature-01' Use this tool after getting component list from Figma MCP. DO NOT use for create-ui, inspire-ui, or refine-ui workflows.",
         inputSchema: {
             figmaComponents: z.array(z.string()).describe("Array of Figma component instance names from Figma MCP (e.g., ['Pro Blocks / Marketing-ui / features-section / Feature 01', 'Pro Blocks / Marketing-ui / hero-section / Hero 03'])"),
         },
@@ -231,7 +230,7 @@ server.registerTool(
                 return {
                     original: componentName,
                     blockName: kebabName,
-                    namespace: `@ss-blocks/${kebabName}`,
+                    namespace: toRegistryItem(kebabName),
                     category: category,
                 };
             });
@@ -515,16 +514,8 @@ server.registerTool(
                 }
 
                 // Convert collected blocks to the format expected
-                // Auto-detect namespace: if block name already has @, use as-is, otherwise add @ss-blocks/
-                blocksToProcess = collectedBlocks.map((block) => {
-                    const blockName = block.blockName;
-                    // If blockName already starts with @, use it as-is (for FTC workflow with @ss-blocks/)
-                    if (blockName.startsWith('@')) {
-                        return blockName;
-                    }
-                    // Otherwise, add @ss-blocks/ prefix (for CUI workflow)
-                    return `@ss-blocks/${blockName}`;
-                });
+                // Auto-detect namespace: add @shadcn-studio/ prefix, rewriting legacy @ss-blocks/
+                blocksToProcess = collectedBlocks.map((block) => toRegistryItem(block.blockName));
             } else {
                 // Use provided items
                 blocksToProcess = items;
@@ -575,7 +566,8 @@ server.registerTool(
     },
     async ({ endpoint }) => {
         try {
-            const url = `/api/mcp/inspiration?blockPath=${endpoint}` + `&license_key=${API_KEY?.replace(/"/g, '')}&email=${EMAIL?.replace(/"/g, '')}`;
+            const credentialQuery = getCredentialQuery();
+            const url = `/api/mcp/inspiration?blockPath=${endpoint}` + (credentialQuery ? `&${credentialQuery}` : "");
             const response = await apiClient.get(url);
             Validator.validateHttpResponse(response.status, url);
 
@@ -642,9 +634,9 @@ server.registerTool(
     },
     async ({ endpoint }) => {
         try {
+            const credentialQuery = getCredentialQuery();
             const url =
-                `/r/components/${endpoint}.json` +
-                `?license_key=${API_KEY?.replace(/"/g, "")}&email=${EMAIL?.replace(/"/g, "")}`;
+                `/r/${REGISTRY_STYLE}/${endpoint}.json` + (credentialQuery ? `?${credentialQuery}` : "");
             const response = await apiClient.get(url);
 
             return {
@@ -848,16 +840,8 @@ server.registerTool(
                 }
 
                 // Convert collected components to the format expected
-                // Components always use @ss-components/ namespace
-                componentsToProcess = collectedComponents.map((comp) => {
-                    const componentName = comp.componentName;
-                    // If componentName already starts with @, use it as-is
-                    if (componentName.startsWith('@')) {
-                        return componentName;
-                    }
-                    // Otherwise, add @ss-components/ prefix
-                    return `@ss-components/${componentName}`;
-                });
+                // Components use @shadcn-studio/ namespace, rewriting legacy @ss-components/
+                componentsToProcess = collectedComponents.map((comp) => toRegistryItem(comp.componentName));
             } else {
                 // Use provided items
                 componentsToProcess = items;
