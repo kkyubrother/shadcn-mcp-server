@@ -7,8 +7,10 @@
     "shadcn-mcp": "build/index.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc && chmod 755 build/index.js"
+    "test": "npm run build && node --test test/*.test.mjs",
+    "build": "tsc && chmod 755 build/index.js",
+    "start:http": "node build/index.js --transport=streamable-http",
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "build"
@@ -24,11 +26,16 @@
   "license": "MIT",
   "description": "shadcn-studio MCP",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.13.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "express": "^5.2.1",
     "zod": "^3.25.67"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^24.0.3",
     "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20.3.0"
   }
 }

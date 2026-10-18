@@ -14,7 +14,7 @@ const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 const parseArguments = (): Config => {
     // Environment variables first; command line arguments override them
-    const config: Config = { apiKey: process.env.API_KEY, email: process.env.EMAIL };
+    const config: Config = { apiKey: process.env.SHADCN_STUDIO_API_KEY, email: process.env.SHADCN_STUDIO_EMAIL };
 
     for (const arg of process.argv) {
         const match = keyValuePatterns.map((pattern) => arg.match(pattern)).find(Boolean);
@@ -41,6 +41,6 @@ const parseArguments = (): Config => {
 export const config = parseArguments();
 
 /**
- * Check if user has pro credentials (both API_KEY and EMAIL provided)
+ * Check if user has pro credentials (both API key and email provided)
  */
 export const isPro = (): boolean => !!(config.apiKey && config.email);

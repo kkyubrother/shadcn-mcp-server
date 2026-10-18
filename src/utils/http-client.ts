@@ -35,7 +35,7 @@ export async function apiGet(endpoint: string): Promise<{ status: number; data: 
             headers["x-email"] = config.email!;
         }
 
-        const response = await fetch(`${BASE_URL}${endpoint}`, { method: "GET", headers });
+        const response = await fetch(`${BASE_URL}${endpoint}`, { method: "GET", headers, signal: AbortSignal.timeout(30000) });
         const data = response.headers.get("content-type")?.includes("application/json")
             ? await response.json()
             : await response.text();
